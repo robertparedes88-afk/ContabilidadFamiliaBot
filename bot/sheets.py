@@ -51,6 +51,9 @@ _MONTHS_ES = {
 # Keywords que identifican filas de sección (se ignoran como conceptos)
 _SECTION_KEYWORDS = ("ingreso", "fijo", "variable", "total", "ahorro", "---", "===")
 
+# Fila 5 del sheet (índice 4 en base 0): cabecera real con los meses ENE..DIC
+_HEADER_ROW_IDX = 4
+
 
 def _get_sheet() -> gspread.Worksheet:
     creds = Credentials.from_service_account_info(
@@ -124,7 +127,7 @@ def add_gasto_variable(concept: str, amount: float) -> dict:
     sheet = _get_sheet()
     month = _current_month_name()
     all_values = sheet.get_all_values()
-    col = _find_month_col(all_values[0], month)
+    col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)
 
     current = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
@@ -139,7 +142,7 @@ def set_gasto_fijo(concept: str, amount: float) -> dict:
     sheet = _get_sheet()
     month = _current_month_name()
     all_values = sheet.get_all_values()
-    col = _find_month_col(all_values[0], month)
+    col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)
 
     current = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
@@ -161,7 +164,7 @@ def get_resumen() -> dict:
     sheet = _get_sheet()
     month = _current_month_name()
     all_values = sheet.get_all_values()
-    col = _find_month_col(all_values[0], month)
+    col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
 
     sections: dict[str, list[tuple[str, float]]] = {
         "ingresos": [],
