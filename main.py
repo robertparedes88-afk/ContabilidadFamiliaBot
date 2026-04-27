@@ -4,6 +4,7 @@ import os
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
 from bot.handlers import (
+    anual_handler,
     ayuda_handler,
     message_handler,
     resumen_handler,
@@ -31,6 +32,7 @@ def main() -> None:
     app.add_handler(CommandHandler("ayuda", ayuda_handler))
     app.add_handler(CommandHandler("resumen", resumen_handler))
     app.add_handler(CommandHandler("saldo", saldo_handler))
+    app.add_handler(CommandHandler("anual", anual_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, message_handler))
 
     logger.info("Bot iniciado en modo webhook — puerto %s", PORT)

@@ -49,6 +49,9 @@ _MONTHS_ES = {
     9: "SEP", 10: "OCT", 11: "NOV", 12: "DIC",
 }
 
+# Orden completo de meses para el resumen anual
+_MONTHS_ORDER = [_MONTHS_ES[i] for i in range(1, 13)]
+
 # Palabras que identifican filas de cabecera/total (se ignoran como conceptos)
 _SECTION_KEYWORDS = (
     "total", "gastos", "ingresos", "ingreso", "fijo", "variable",
@@ -202,13 +205,42 @@ def subtract_gasto_fijo(concept: str, amount: float) -> dict:
     return {"concept": matched, "month": month, "old": current, "new": new_value, "delta": amount}
 
 
-def get_resumen() -> dict:
+def get_valor_concepto_mes(concept: str, month: str) -> dict:
+    """Devuelve el valor de un concepto en un mes específico."""
+    sheet = _get_sheet()
+    all_values = sheet.get_all_values()
+    col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
+    row, matched = _find_concept_row(all_values, concept)
+    val = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
+    return {"concept": matched, "month": month, "value": val}
+
+
+def get_anual_concepto(concept: str) -> dict:
+    """Devuelve el valor de un concepto en cada mes del año y el total."""
+    sheet = _get_sheet()
+    all_values = sheet.get_all_values()
+    header = all_values[_HEADER_ROW_IDX]
+    row, matched = _find_concept_row(all_values, concept)
+    row_data = all_values[row - 1]
+
+    values: dict[str, Optional[float]] = {}
+    for month in _MONTHS_ORDER:
+        try:
+            col = _find_month_col(header, month)
+            values[month] = _cell_float(row_data[col - 1] if len(row_data) >= col else "")
+        except ValueError:
+            values[month] = None  # columna no existe en la hoja
+
+    return {"concept": matched, "year": datetime.now().year, "values": values}
+
+
+def get_resumen(month: Optional[str] = None) -> dict:
     """
-    Lee toda la hoja y devuelve un resumen estructurado del mes actual.
-    Detecta secciones por palabras clave en la columna A.
+    Lee toda la hoja y devuelve un resumen estructurado.
+    Si no se indica mes, usa el mes actual.
     """
     sheet = _get_sheet()
-    month = _current_month_name()
+    month = month or _current_month_name()
     all_values = sheet.get_all_values()
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
 
