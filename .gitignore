@@ -1,0 +1,20 @@
+.env
+.claude/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+.DS_Store
+# Credenciales de Google (cualquier nombre)
+credentials.json
+*-credentials.json
+sonorous-charge-*.json
+*.serviceaccount.json
+*.log
