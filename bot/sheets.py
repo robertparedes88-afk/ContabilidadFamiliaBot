@@ -172,6 +172,36 @@ def set_ingreso(person: str, amount: float) -> dict:
     return set_gasto_fijo(person, amount)
 
 
+def subtract_gasto_variable(concept: str, amount: float) -> dict:
+    """Resta `amount` del valor actual (revertir un gasto variable)."""
+    sheet = _get_sheet()
+    month = _current_month_name()
+    all_values = sheet.get_all_values()
+    col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
+    row, matched = _find_concept_row(all_values, concept)
+
+    current = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
+    new_value = round(current - amount, 2)
+    sheet.update_cell(row, col, new_value)
+
+    return {"concept": matched, "month": month, "old": current, "new": new_value, "delta": amount}
+
+
+def subtract_gasto_fijo(concept: str, amount: float) -> dict:
+    """Resta `amount` del valor actual (revertir un gasto fijo)."""
+    sheet = _get_sheet()
+    month = _current_month_name()
+    all_values = sheet.get_all_values()
+    col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
+    row, matched = _find_concept_row(all_values, concept)
+
+    current = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
+    new_value = round(current - amount, 2)
+    sheet.update_cell(row, col, new_value)
+
+    return {"concept": matched, "month": month, "old": current, "new": new_value, "delta": amount}
+
+
 def get_resumen() -> dict:
     """
     Lee toda la hoja y devuelve un resumen estructurado del mes actual.

@@ -4,7 +4,14 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from bot.parser import parse_message
-from bot.sheets import add_gasto_variable, get_resumen, set_gasto_fijo, set_ingreso
+from bot.sheets import (
+    add_gasto_variable,
+    get_resumen,
+    set_gasto_fijo,
+    set_ingreso,
+    subtract_gasto_fijo,
+    subtract_gasto_variable,
+)
 from config import ALLOWED_CHAT_IDS
 
 logger = logging.getLogger(__name__)
@@ -20,6 +27,9 @@ _HELP_TEXT = (
     "*Registrar ingreso:*\n"
     "  `Pere cobrado 1500`\n"
     "  `Alicia cobrada 3800`\n\n"
+    "*Revertir un error:*\n"
+    "  `140 variable restaurante deshacer`\n"
+    "  `737 fijo hipoteca deshacer`\n\n"
     "*Consultas:*\n"
     "  /resumen — resumen completo del mes\n"
     "  /saldo   — ahorro del mes\n"
@@ -160,6 +170,36 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await update.message.reply_text(f"❌ {e}")
         except Exception as e:
             logger.error("ingreso error: %s", e)
+            await update.message.reply_text(f"❌ Error inesperado: {e}")
+
+    elif parsed.type == "gasto_variable_deshacer":
+        try:
+            r = subtract_gasto_variable(parsed.concept, parsed.amount)
+            await update.message.reply_text(
+                f"✅ *Gasto revertido*\n"
+                f"📌 {r['concept']} — {r['month']}\n"
+                f"{_fmt(r['old'])} → *{_fmt(r['new'])}* (-{_fmt(r['delta'])})",
+                parse_mode="Markdown",
+            )
+        except ValueError as e:
+            await update.message.reply_text(f"❌ {e}")
+        except Exception as e:
+            logger.error("gasto_variable_deshacer error: %s", e)
+            await update.message.reply_text(f"❌ Error inesperado: {e}")
+
+    elif parsed.type == "gasto_fijo_deshacer":
+        try:
+            r = subtract_gasto_fijo(parsed.concept, parsed.amount)
+            await update.message.reply_text(
+                f"✅ *Gasto revertido*\n"
+                f"📌 {r['concept']} — {r['month']}\n"
+                f"{_fmt(r['old'])} → *{_fmt(r['new'])}* (-{_fmt(r['delta'])})",
+                parse_mode="Markdown",
+            )
+        except ValueError as e:
+            await update.message.reply_text(f"❌ {e}")
+        except Exception as e:
+            logger.error("gasto_fijo_deshacer error: %s", e)
             await update.message.reply_text(f"❌ Error inesperado: {e}")
 
     # Si es desconocido, no respondemos para no generar ruido.

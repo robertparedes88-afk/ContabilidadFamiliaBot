@@ -5,7 +5,11 @@ from typing import Literal, Optional
 
 @dataclass
 class ParsedMessage:
-    type: Literal["gasto_variable", "gasto_fijo", "ingreso", "unknown"]
+    type: Literal[
+        "gasto_variable", "gasto_fijo",
+        "gasto_variable_deshacer", "gasto_fijo_deshacer",
+        "ingreso", "unknown"
+    ]
     amount: Optional[float] = None
     concept: Optional[str] = None
     person: Optional[str] = None
@@ -17,6 +21,24 @@ def _parse_amount(raw: str) -> float:
 
 def parse_message(text: str) -> ParsedMessage:
     text = text.strip()
+
+    # "140 variable restaurante deshacer"  — debe ir antes que el patrón sin deshacer
+    m = re.match(r"^(\d+(?:[.,]\d+)?)\s+variable\s+(.+?)\s+deshacer$", text, re.IGNORECASE)
+    if m:
+        return ParsedMessage(
+            type="gasto_variable_deshacer",
+            amount=_parse_amount(m.group(1)),
+            concept=m.group(2).strip(),
+        )
+
+    # "737 fijo hipoteca deshacer"
+    m = re.match(r"^(\d+(?:[.,]\d+)?)\s+fijo\s+(.+?)\s+deshacer$", text, re.IGNORECASE)
+    if m:
+        return ParsedMessage(
+            type="gasto_fijo_deshacer",
+            amount=_parse_amount(m.group(1)),
+            concept=m.group(2).strip(),
+        )
 
     # "140 variable restaurante"
     m = re.match(r"^(\d+(?:[.,]\d+)?)\s+variable\s+(.+)$", text, re.IGNORECASE)
