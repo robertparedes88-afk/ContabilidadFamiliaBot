@@ -81,10 +81,10 @@ def _current_month_name() -> str:
 
 
 def _find_month_col(header_row: list[str], month_name: str) -> int:
-    """Returns 1-indexed column for the given month name."""
+    """Returns 0-indexed position of the month in the header row (Python array index)."""
     for i, cell in enumerate(header_row):
         if cell.strip().lower() == month_name.lower():
-            return i + 1
+            return i
     raise ValueError(f"Mes '{month_name}' no encontrado en la cabecera de la hoja.")
 
 
@@ -155,9 +155,9 @@ def add_gasto_variable(concept: str, amount: float) -> dict:
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)
 
-    current = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
+    current = _cell_float(all_values[row - 1][col] if len(all_values[row - 1]) > col else "")
     new_value = round(current + amount, 2)
-    sheet.update_cell(row, col, new_value)
+    sheet.update_cell(row, col + 1, new_value)
 
     return {"concept": matched, "month": month, "old": current, "new": new_value, "delta": amount}
 
@@ -170,8 +170,8 @@ def set_gasto_fijo(concept: str, amount: float) -> dict:
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)
 
-    current = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
-    sheet.update_cell(row, col, round(amount, 2))
+    current = _cell_float(all_values[row - 1][col] if len(all_values[row - 1]) > col else "")
+    sheet.update_cell(row, col + 1, round(amount, 2))
 
     return {"concept": matched, "month": month, "old": current, "new": amount}
 
@@ -189,9 +189,9 @@ def subtract_gasto_variable(concept: str, amount: float) -> dict:
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)
 
-    current = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
+    current = _cell_float(all_values[row - 1][col] if len(all_values[row - 1]) > col else "")
     new_value = round(current - amount, 2)
-    sheet.update_cell(row, col, new_value)
+    sheet.update_cell(row, col + 1, new_value)
 
     return {"concept": matched, "month": month, "old": current, "new": new_value, "delta": amount}
 
@@ -204,9 +204,9 @@ def subtract_gasto_fijo(concept: str, amount: float) -> dict:
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)
 
-    current = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
+    current = _cell_float(all_values[row - 1][col] if len(all_values[row - 1]) > col else "")
     new_value = round(current - amount, 2)
-    sheet.update_cell(row, col, new_value)
+    sheet.update_cell(row, col + 1, new_value)
 
     return {"concept": matched, "month": month, "old": current, "new": new_value, "delta": amount}
 
@@ -217,7 +217,7 @@ def get_valor_concepto_mes(concept: str, month: str) -> dict:
     all_values = sheet.get_all_values()
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)
-    val = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
+    val = _cell_float(all_values[row - 1][col] if len(all_values[row - 1]) > col else "")
     return {"concept": matched, "month": month, "value": val}
 
 
@@ -233,7 +233,7 @@ def get_anual_concepto(concept: str) -> dict:
     for month in _MONTHS_ORDER:
         try:
             col = _find_month_col(header, month)
-            values[month] = _cell_float(row_data[col - 1] if len(row_data) >= col else "")
+            values[month] = _cell_float(row_data[col] if len(row_data) > col else "")
         except ValueError:
             values[month] = None  # columna no existe en la hoja
 
@@ -252,7 +252,7 @@ def _read_rows(
         label = row[1].strip() if len(row) > 1 else ""
         if not label:
             continue
-        val = _cell_float(row[col - 1] if len(row) >= col else "")
+        val = _cell_float(row[col] if len(row) > col else "")
         result.append((label, val))
     return result
 
@@ -267,9 +267,6 @@ def get_resumen(month: Optional[str] = None) -> dict:
     month = month or _current_month_name()
     all_values = sheet.get_all_values()
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
-
-    # DEBUG TEMP
-    logger.warning("DEBUG col=%d | fila6=%s | fila7=%s", col, all_values[5], all_values[6])
 
     ingresos         = _read_rows(all_values, *_ROWS_INGRESOS,         col)
     gastos_fijos     = _read_rows(all_values, *_ROWS_GASTOS_FIJOS,     col)
