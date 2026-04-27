@@ -9,7 +9,7 @@ class ParsedMessage:
         "gasto_variable", "gasto_fijo",
         "gasto_variable_deshacer", "gasto_fijo_deshacer",
         "ingreso", "ingreso_deshacer",
-        "consulta_concepto_mes", "unknown"
+        "nueva_categoria", "consulta_concepto_mes", "unknown"
     ]
     amount: Optional[float] = None
     concept: Optional[str] = None
@@ -144,6 +144,14 @@ def parse_message(text: str) -> ParsedMessage:
             amount=_parse_amount(m.group(2)),
             person="Alícia",
             month=month,
+        )
+
+    # "nueva categoria [nombre]" / "nueva categoría [nombre]"
+    m = re.match(r"^nueva\s+categor[ií]a\s+(.+)$", text, re.IGNORECASE)
+    if m:
+        return ParsedMessage(
+            type="nueva_categoria",
+            concept=m.group(1).strip(),
         )
 
     # "[concepto] [mes]" — último token es un mes conocido (consulta)

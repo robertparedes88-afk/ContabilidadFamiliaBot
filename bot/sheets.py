@@ -65,7 +65,7 @@ _HEADER_ROW_IDX = 4
 _ROWS_INGRESOS         = (6,  7)
 _ROWS_GASTOS_FIJOS     = (12, 16)
 _ROWS_RECURRENTES      = (21, 32)
-_ROWS_GASTOS_VARIABLES = (37, 43)
+_ROWS_GASTOS_VARIABLES = (37, 80)  # holgura para nuevas categorías
 
 
 def _get_year_sheet_name(year: int) -> Optional[str]:
@@ -310,18 +310,63 @@ def get_anual_concepto(concept: str) -> dict:
 def _read_rows(
     all_values: list[list[str]], start_row: int, end_row: int, col: int
 ) -> list[tuple[str, float]]:
-    """Lee labels (col B) y valores (col `col`) de un rango de filas 1-indexed."""
+    """Lee labels (col B) y valores (col `col`) de un rango de filas 1-indexed.
+    Ignora filas de cabecera/total para que el rango pueda ser holgado."""
     result = []
     for i in range(start_row - 1, end_row):
         if i >= len(all_values):
             break
         row = all_values[i]
         label = row[1].strip() if len(row) > 1 else ""
-        if not label:
+        if not label or _is_section_header(label):
             continue
         val = _cell_float(row[col] if len(row) > col else "")
         result.append((label, val))
     return result
+
+
+def crear_categoria_variable(nombre: str) -> str:
+    """
+    Inserta una nueva fila de categoría variable justo antes de la fila
+    'TOTAL GASTOS VARIABLES'. Lanza ValueError si ya existe.
+    Devuelve el nombre normalizado de la categoría creada.
+    """
+    sheet = _get_sheet()
+    all_values = sheet.get_all_values()
+    header = all_values[_HEADER_ROW_IDX]
+
+    # Comprobar si ya existe (búsqueda flexible)
+    existe = True
+    try:
+        _find_concept_row(all_values, nombre)
+    except ValueError:
+        existe = False
+    if existe:
+        raise ValueError(f"La categoría '{nombre}' ya existe en el Sheet.")
+
+    # Encontrar la fila del total de gastos variables
+    total_row = None
+    for i, row in enumerate(all_values):
+        label = row[1].strip() if len(row) > 1 else ""
+        if "total" in label.lower() and "variable" in label.lower():
+            total_row = i + 1  # 1-indexed
+            break
+    if total_row is None:
+        raise ValueError("No se encontró 'TOTAL GASTOS VARIABLES' en la hoja.")
+
+    # Construir la nueva fila: vacío en A, nombre en B, 0 en columnas de meses
+    num_cols = len(header)
+    new_row: list = [""] * num_cols
+    new_row[1] = nombre.capitalize()
+    for month in _MONTHS_ORDER:
+        try:
+            col_idx = _find_month_col(header, month)
+            new_row[col_idx] = 0
+        except ValueError:
+            pass
+
+    sheet.insert_row(new_row, total_row)
+    return new_row[1]
 
 
 def get_resumen(month: Optional[str] = None) -> dict:

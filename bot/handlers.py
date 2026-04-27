@@ -6,6 +6,7 @@ from telegram.ext import ContextTypes
 from bot.parser import MONTH_NAMES, parse_message
 from bot.sheets import (
     add_gasto_variable,
+    crear_categoria_variable,
     get_anual_concepto,
     get_resumen,
     get_valor_concepto_mes,
@@ -36,6 +37,8 @@ _HELP_TEXT = (
     "*Revertir un error:*\n"
     "  `140 variable restaurante deshacer`\n"
     "  `50 variable gasolina marzo deshacer`\n\n"
+    "*Crear nueva categoría variable:*\n"
+    "  `nueva categoria veterinario`\n\n"
     "*Consultar concepto en un mes:*\n"
     "  `coche marzo`  |  `restaurante abril`\n\n"
     "*Consultas generales:*\n"
@@ -283,6 +286,23 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             await update.message.reply_text(f"❌ {e}")
         except Exception as e:
             logger.error("gasto_fijo_deshacer error: %s", e)
+            await update.message.reply_text(f"❌ Error inesperado: {e}")
+
+    elif parsed.type == "nueva_categoria":
+        try:
+            nombre = crear_categoria_variable(parsed.concept)
+            await update.message.reply_text(
+                f"✅ *Nueva categoría creada: {nombre}*\n"
+                f"Ya puedes registrar gastos con `50 variable {nombre.lower()}`",
+                parse_mode="Markdown",
+            )
+        except ValueError as e:
+            if "ya existe" in str(e):
+                await update.message.reply_text(f"⚠️ {e}")
+            else:
+                await update.message.reply_text(f"❌ {e}")
+        except Exception as e:
+            logger.error("nueva_categoria error: %s", e)
             await update.message.reply_text(f"❌ Error inesperado: {e}")
 
     elif parsed.type == "ingreso_deshacer":
