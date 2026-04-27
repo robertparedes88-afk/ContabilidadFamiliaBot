@@ -113,6 +113,12 @@ async def resumen_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         lines.append(f"  {concept}: {_fmt(val)}")
     lines.append(f"  *Total: {_fmt(data['total_fijos'])}*\n")
 
+    lines.append("🔄 *GASTOS RECURRENTES*")
+    for concept, val in data["gastos_recurrentes"]:
+        if val > 0:
+            lines.append(f"  {concept}: {_fmt(val)}")
+    lines.append(f"  *Total: {_fmt(data['total_recurrentes'])}*\n")
+
     lines.append("🛒 *GASTOS VARIABLES*")
     for concept, val in data["gastos_variables"]:
         if val > 0:

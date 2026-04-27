@@ -61,6 +61,12 @@ _SECTION_KEYWORDS = (
 # Fila 5 del sheet (índice 4 en base 0): cabecera real con los meses ENE..DIC
 _HEADER_ROW_IDX = 4
 
+# Rangos de filas por sección (1-indexed, inclusivos)
+_ROWS_INGRESOS         = (6,  7)
+_ROWS_GASTOS_FIJOS     = (12, 16)
+_ROWS_RECURRENTES      = (21, 32)
+_ROWS_GASTOS_VARIABLES = (37, 43)
+
 
 def _get_sheet() -> gspread.Worksheet:
     creds = Credentials.from_service_account_info(
@@ -234,9 +240,27 @@ def get_anual_concepto(concept: str) -> dict:
     return {"concept": matched, "year": datetime.now().year, "values": values}
 
 
+def _read_rows(
+    all_values: list[list[str]], start_row: int, end_row: int, col: int
+) -> list[tuple[str, float]]:
+    """Lee labels (col B) y valores (col `col`) de un rango de filas 1-indexed."""
+    result = []
+    for i in range(start_row - 1, end_row):
+        if i >= len(all_values):
+            break
+        row = all_values[i]
+        label = row[1].strip() if len(row) > 1 else ""
+        if not label:
+            continue
+        val = _cell_float(row[col - 1] if len(row) >= col else "")
+        result.append((label, val))
+    return result
+
+
 def get_resumen(month: Optional[str] = None) -> dict:
     """
     Lee toda la hoja y devuelve un resumen estructurado.
+    Usa rangos de fila fijos para cada sección.
     Si no se indica mes, usa el mes actual.
     """
     sheet = _get_sheet()
@@ -244,53 +268,28 @@ def get_resumen(month: Optional[str] = None) -> dict:
     all_values = sheet.get_all_values()
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
 
-    sections: dict[str, list[tuple[str, float]]] = {
-        "ingresos": [],
-        "gastos_fijos": [],
-        "gastos_variables": [],
-    }
+    ingresos         = _read_rows(all_values, *_ROWS_INGRESOS,         col)
+    gastos_fijos     = _read_rows(all_values, *_ROWS_GASTOS_FIJOS,     col)
+    recurrentes      = _read_rows(all_values, *_ROWS_RECURRENTES,       col)
+    gastos_variables = _read_rows(all_values, *_ROWS_GASTOS_VARIABLES,  col)
 
-    current_section: Optional[str] = None
-
-    for row in all_values[1:]:
-        label = row[1].strip() if len(row) > 1 else ""  # columna B
-        if not label:
-            continue
-
-        label_low = label.lower()
-
-        # Detectar cambio de sección por palabras clave en col B
-        if "ingreso" in label_low:
-            current_section = "ingresos"
-            continue
-        if "fijo" in label_low:
-            current_section = "gastos_fijos"
-            continue
-        if "variable" in label_low:
-            current_section = "gastos_variables"
-            continue
-
-        # Ignorar filas de totales u otros marcadores
-        if _is_section_header(label) or current_section is None:
-            continue
-
-        val = _cell_float(row[col - 1] if len(row) >= col else "")
-        sections[current_section].append((label, val))
-
-    total_ingresos = sum(v for _, v in sections["ingresos"])
-    total_fijos = sum(v for _, v in sections["gastos_fijos"])
-    total_variables = sum(v for _, v in sections["gastos_variables"])
-    total_gastos = total_fijos + total_variables
-    ahorro = total_ingresos - total_gastos
+    total_ingresos    = sum(v for _, v in ingresos)
+    total_fijos       = sum(v for _, v in gastos_fijos)
+    total_recurrentes = sum(v for _, v in recurrentes)
+    total_variables   = sum(v for _, v in gastos_variables)
+    total_gastos      = total_fijos + total_recurrentes + total_variables
+    ahorro            = total_ingresos - total_gastos
 
     return {
-        "month": month,
-        "ingresos": sections["ingresos"],
-        "gastos_fijos": sections["gastos_fijos"],
-        "gastos_variables": sections["gastos_variables"],
-        "total_ingresos": total_ingresos,
-        "total_fijos": total_fijos,
-        "total_variables": total_variables,
-        "total_gastos": total_gastos,
-        "ahorro": ahorro,
+        "month":              month,
+        "ingresos":           ingresos,
+        "gastos_fijos":       gastos_fijos,
+        "gastos_recurrentes": recurrentes,
+        "gastos_variables":   gastos_variables,
+        "total_ingresos":     total_ingresos,
+        "total_fijos":        total_fijos,
+        "total_recurrentes":  total_recurrentes,
+        "total_variables":    total_variables,
+        "total_gastos":       total_gastos,
+        "ahorro":             ahorro,
     }
