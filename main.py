@@ -11,7 +11,8 @@ from bot.handlers import (
     saldo_handler,
     start_handler,
 )
-from config import TELEGRAM_TOKEN
+from bot.sheets import ensure_current_year_sheet
+from config import ALLOWED_CHAT_IDS, TELEGRAM_TOKEN
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -25,8 +26,26 @@ WEBHOOK_URL = "https://web-production-ec414.up.railway.app/webhook"
 PORT = int(os.environ.get("PORT", 8080))
 
 
+async def post_init(application: Application) -> None:
+    """Al arrancar, crea la hoja del año nuevo si es enero y no existe."""
+    try:
+        new_sheet = ensure_current_year_sheet()
+        if new_sheet and ALLOWED_CHAT_IDS:
+            for chat_id in ALLOWED_CHAT_IDS:
+                await application.bot.send_message(
+                    chat_id=chat_id,
+                    text=(
+                        f"🎉 Nuevo año! He creado la hoja *{new_sheet}* automáticamente.\n"
+                        "A partir de ahora todos los registros van a esta hoja."
+                    ),
+                    parse_mode="Markdown",
+                )
+    except Exception as e:
+        logger.error("post_init — error comprobando hoja del año: %s", e)
+
+
 def main() -> None:
-    app = Application.builder().token(TELEGRAM_TOKEN).build()
+    app = Application.builder().token(TELEGRAM_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start_handler))
     app.add_handler(CommandHandler("ayuda", ayuda_handler))

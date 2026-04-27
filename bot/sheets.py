@@ -68,12 +68,71 @@ _ROWS_RECURRENTES      = (21, 32)
 _ROWS_GASTOS_VARIABLES = (37, 43)
 
 
-def _get_sheet() -> gspread.Worksheet:
+def _get_year_sheet_name(year: int) -> Optional[str]:
+    """Si SHEET_NAME termina en un año de 4 dígitos, devuelve el nombre para `year`."""
+    import re as _re
+    m = _re.match(r"^(.*?)(\d{4})\s*$", SHEET_NAME.strip())
+    if m:
+        return f"{m.group(1)}{year}"
+    return None
+
+
+def _get_client_and_spreadsheet():
     creds = Credentials.from_service_account_info(
         json.loads(GOOGLE_CREDENTIALS_JSON), scopes=_SCOPES
     )
     client = gspread.authorize(creds)
-    return client.open_by_key(SPREADSHEET_ID).worksheet(SHEET_NAME)
+    return client, client.open_by_key(SPREADSHEET_ID)
+
+
+def _get_sheet() -> gspread.Worksheet:
+    _, spreadsheet = _get_client_and_spreadsheet()
+    year_name = _get_year_sheet_name(datetime.now().year)
+    if year_name:
+        try:
+            return spreadsheet.worksheet(year_name)
+        except gspread.WorksheetNotFound:
+            pass
+    return spreadsheet.worksheet(SHEET_NAME)
+
+
+def ensure_current_year_sheet() -> Optional[str]:
+    """
+    Si es enero y la hoja del año actual no existe, la crea copiando la del
+    año anterior y borrando los valores de datos. Devuelve el nombre de la
+    hoja nueva, o None si no fue necesario crearla.
+    """
+    now = datetime.now()
+    if now.month != 1:
+        return None
+
+    year_name = _get_year_sheet_name(now.year)
+    if not year_name:
+        logger.warning("ensure_current_year_sheet: SHEET_NAME no incluye año, omitiendo.")
+        return None
+
+    _, spreadsheet = _get_client_and_spreadsheet()
+    existing = {ws.title for ws in spreadsheet.worksheets()}
+
+    if year_name in existing:
+        return None
+
+    # Fuente: hoja del año anterior o la hoja configurada
+    prev_name = _get_year_sheet_name(now.year - 1)
+    source_name = prev_name if (prev_name and prev_name in existing) else SHEET_NAME
+    source = spreadsheet.worksheet(source_name)
+
+    new_sheet = spreadsheet.duplicate_sheet(
+        source_sheet_id=source.id,
+        new_sheet_name=year_name,
+        insert_sheet_index=0,
+    )
+
+    # Borrar solo las celdas de datos (columnas D-P, filas 6-60)
+    new_sheet.batch_clear(["D6:P60"])
+
+    logger.info("Hoja '%s' creada desde '%s'.", year_name, source_name)
+    return year_name
 
 
 def _current_month_name() -> str:
@@ -155,10 +214,10 @@ def _cell_float(value: str) -> float:
 # ── Public API ────────────────────────────────────────────────────────────────
 
 
-def add_gasto_variable(concept: str, amount: float) -> dict:
-    """Suma `amount` al valor actual de la celda del mes corriente."""
+def add_gasto_variable(concept: str, amount: float, month: Optional[str] = None) -> dict:
+    """Suma `amount` al valor actual. Si no se indica mes, usa el actual."""
     sheet = _get_sheet()
-    month = _current_month_name()
+    month = month or _current_month_name()
     all_values = sheet.get_all_values()
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)
@@ -170,10 +229,10 @@ def add_gasto_variable(concept: str, amount: float) -> dict:
     return {"concept": matched, "month": month, "old": current, "new": new_value, "delta": amount}
 
 
-def set_gasto_fijo(concept: str, amount: float) -> dict:
-    """Reemplaza el valor de la celda del mes corriente."""
+def set_gasto_fijo(concept: str, amount: float, month: Optional[str] = None) -> dict:
+    """Reemplaza el valor de la celda. Si no se indica mes, usa el actual."""
     sheet = _get_sheet()
-    month = _current_month_name()
+    month = month or _current_month_name()
     all_values = sheet.get_all_values()
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)
@@ -184,15 +243,15 @@ def set_gasto_fijo(concept: str, amount: float) -> dict:
     return {"concept": matched, "month": month, "old": current, "new": amount}
 
 
-def set_ingreso(person: str, amount: float) -> dict:
-    """Reemplaza el ingreso de la persona en el mes corriente."""
-    return set_gasto_fijo(person, amount)
+def set_ingreso(person: str, amount: float, month: Optional[str] = None) -> dict:
+    """Reemplaza el ingreso de la persona. Si no se indica mes, usa el actual."""
+    return set_gasto_fijo(person, amount, month)
 
 
-def subtract_gasto_variable(concept: str, amount: float) -> dict:
-    """Resta `amount` del valor actual (revertir un gasto variable)."""
+def subtract_gasto_variable(concept: str, amount: float, month: Optional[str] = None) -> dict:
+    """Resta `amount` del valor actual. Si no se indica mes, usa el actual."""
     sheet = _get_sheet()
-    month = _current_month_name()
+    month = month or _current_month_name()
     all_values = sheet.get_all_values()
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)
@@ -204,10 +263,10 @@ def subtract_gasto_variable(concept: str, amount: float) -> dict:
     return {"concept": matched, "month": month, "old": current, "new": new_value, "delta": amount}
 
 
-def subtract_gasto_fijo(concept: str, amount: float) -> dict:
-    """Resta `amount` del valor actual (revertir un gasto fijo)."""
+def subtract_gasto_fijo(concept: str, amount: float, month: Optional[str] = None) -> dict:
+    """Resta `amount` del valor actual. Si no se indica mes, usa el actual."""
     sheet = _get_sheet()
-    month = _current_month_name()
+    month = month or _current_month_name()
     all_values = sheet.get_all_values()
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
     row, matched = _find_concept_row(all_values, concept)

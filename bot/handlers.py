@@ -29,12 +29,15 @@ _HELP_TEXT = (
     "*Registrar ingreso:*\n"
     "  `Pere cobrado 1500`\n"
     "  `Alicia cobrada 3800`\n\n"
+    "*Registrar en un mes específico:*\n"
+    "  `85 variable ropa enero`\n"
+    "  `737 fijo hipoteca marzo`\n"
+    "  `Pere cobrado 1478 enero`\n\n"
     "*Revertir un error:*\n"
     "  `140 variable restaurante deshacer`\n"
-    "  `737 fijo hipoteca deshacer`\n\n"
+    "  `50 variable gasolina marzo deshacer`\n\n"
     "*Consultar concepto en un mes:*\n"
-    "  `coche marzo`\n"
-    "  `restaurante abril`\n\n"
+    "  `coche marzo`  |  `restaurante abril`\n\n"
     "*Consultas generales:*\n"
     "  /resumen — resumen del mes actual\n"
     "  /resumen marzo — resumen de un mes específico\n"
@@ -209,7 +212,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if parsed.type == "gasto_variable":
         try:
-            r = add_gasto_variable(parsed.concept, parsed.amount)
+            r = add_gasto_variable(parsed.concept, parsed.amount, parsed.month)
             await update.message.reply_text(
                 f"✅ *Gasto variable registrado*\n"
                 f"📌 {r['concept']} — {r['month']}\n"
@@ -224,7 +227,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     elif parsed.type == "gasto_fijo":
         try:
-            r = set_gasto_fijo(parsed.concept, parsed.amount)
+            r = set_gasto_fijo(parsed.concept, parsed.amount, parsed.month)
             await update.message.reply_text(
                 f"✅ *Gasto fijo actualizado*\n"
                 f"📌 {r['concept']} — {r['month']}\n"
@@ -239,7 +242,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     elif parsed.type == "ingreso":
         try:
-            r = set_ingreso(parsed.person, parsed.amount)
+            r = set_ingreso(parsed.person, parsed.amount, parsed.month)
             await update.message.reply_text(
                 f"✅ *Ingreso registrado*\n"
                 f"👤 {r['concept']} — {r['month']}\n"
@@ -254,7 +257,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     elif parsed.type == "gasto_variable_deshacer":
         try:
-            r = subtract_gasto_variable(parsed.concept, parsed.amount)
+            r = subtract_gasto_variable(parsed.concept, parsed.amount, parsed.month)
             await update.message.reply_text(
                 f"✅ *Gasto revertido*\n"
                 f"📌 {r['concept']} — {r['month']}\n"
@@ -269,7 +272,7 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     elif parsed.type == "gasto_fijo_deshacer":
         try:
-            r = subtract_gasto_fijo(parsed.concept, parsed.amount)
+            r = subtract_gasto_fijo(parsed.concept, parsed.amount, parsed.month)
             await update.message.reply_text(
                 f"✅ *Gasto revertido*\n"
                 f"📌 {r['concept']} — {r['month']}\n"

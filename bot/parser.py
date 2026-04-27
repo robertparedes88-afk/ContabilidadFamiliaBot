@@ -37,65 +37,91 @@ def _parse_amount(raw: str) -> float:
     return float(raw.replace(",", "."))
 
 
+def _split_month(text: str) -> tuple[str, Optional[str]]:
+    """
+    Si la última palabra de `text` es un mes conocido, lo separa y devuelve
+    (concepto, abreviatura). Si no, devuelve (text, None).
+    """
+    words = text.split()
+    if len(words) >= 2:
+        abbr = MONTH_NAMES.get(words[-1].lower())
+        if abbr:
+            return " ".join(words[:-1]).strip(), abbr
+    return text, None
+
+
 def parse_message(text: str) -> ParsedMessage:
     text = text.strip()
 
-    # "140 variable restaurante deshacer"  — antes que el patrón sin deshacer
+    # "[importe] variable [concepto] [mes?] deshacer"  — antes que el patrón sin deshacer
     m = re.match(r"^(\d+(?:[.,]\d+)?)\s+variable\s+(.+?)\s+deshacer$", text, re.IGNORECASE)
     if m:
+        concept, month = _split_month(m.group(2).strip())
         return ParsedMessage(
             type="gasto_variable_deshacer",
             amount=_parse_amount(m.group(1)),
-            concept=m.group(2).strip(),
+            concept=concept,
+            month=month,
         )
 
-    # "737 fijo hipoteca deshacer"
+    # "[importe] fijo [concepto] [mes?] deshacer"
     m = re.match(r"^(\d+(?:[.,]\d+)?)\s+fijo\s+(.+?)\s+deshacer$", text, re.IGNORECASE)
     if m:
+        concept, month = _split_month(m.group(2).strip())
         return ParsedMessage(
             type="gasto_fijo_deshacer",
             amount=_parse_amount(m.group(1)),
-            concept=m.group(2).strip(),
+            concept=concept,
+            month=month,
         )
 
-    # "140 variable restaurante"
+    # "[importe] variable [concepto] [mes?]"
     m = re.match(r"^(\d+(?:[.,]\d+)?)\s+variable\s+(.+)$", text, re.IGNORECASE)
     if m:
+        concept, month = _split_month(m.group(2).strip())
         return ParsedMessage(
             type="gasto_variable",
             amount=_parse_amount(m.group(1)),
-            concept=m.group(2).strip(),
+            concept=concept,
+            month=month,
         )
 
-    # "737 fijo hipoteca"
+    # "[importe] fijo [concepto] [mes?]"
     m = re.match(r"^(\d+(?:[.,]\d+)?)\s+fijo\s+(.+)$", text, re.IGNORECASE)
     if m:
+        concept, month = _split_month(m.group(2).strip())
         return ParsedMessage(
             type="gasto_fijo",
             amount=_parse_amount(m.group(1)),
-            concept=m.group(2).strip(),
+            concept=concept,
+            month=month,
         )
 
-    # "Pere cobrado 1500"
-    m = re.match(r"^(pere)\s+cobrado\s+(\d+(?:[.,]\d+)?)$", text, re.IGNORECASE)
+    # "Pere cobrado 1500 [mes?]"
+    m = re.match(r"^(pere)\s+cobrado\s+(\d+(?:[.,]\d+)?)(?:\s+(\w+))?$", text, re.IGNORECASE)
     if m:
+        raw_month = m.group(3)
+        month = MONTH_NAMES.get(raw_month.lower()) if raw_month else None
         return ParsedMessage(
             type="ingreso",
             amount=_parse_amount(m.group(2)),
             person="Pere",
+            month=month,
         )
 
-    # "Alicia cobrada 3800" / "Alícia cobrada 3800"
-    m = re.match(r"^(alici[aá])\s+cobrada\s+(\d+(?:[.,]\d+)?)$", text, re.IGNORECASE)
+    # "Alicia cobrada 3800 [mes?]" / "Alícia cobrada 3800 [mes?]"
+    m = re.match(r"^(alici[aá])\s+cobrada\s+(\d+(?:[.,]\d+)?)(?:\s+(\w+))?$", text, re.IGNORECASE)
     if m:
+        raw_month = m.group(3)
+        month = MONTH_NAMES.get(raw_month.lower()) if raw_month else None
         return ParsedMessage(
             type="ingreso",
             amount=_parse_amount(m.group(2)),
             person="Alícia",
+            month=month,
         )
 
-    # "[concepto] [mes]" — último token es un mes conocido
-    # Se comprueba al final para no interferir con los patrones anteriores
+    # "[concepto] [mes]" — último token es un mes conocido (consulta)
     words = text.split()
     if len(words) >= 2:
         abbr = MONTH_NAMES.get(words[-1].lower())
