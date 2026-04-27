@@ -27,6 +27,7 @@ Ejemplo de hoja válida:
 import difflib
 import json
 import logging
+import unicodedata
 from datetime import datetime
 from typing import Optional
 
@@ -80,10 +81,16 @@ def _is_section_header(text: str) -> bool:
     return any(kw in low for kw in _SECTION_KEYWORDS)
 
 
+def _norm(text: str) -> str:
+    """Lowercase + strip accents for flexible matching."""
+    return unicodedata.normalize("NFD", text.lower()).encode("ascii", "ignore").decode().strip()
+
+
 def _find_concept_row(all_values: list[list[str]], concept: str) -> tuple[int, str]:
     """
     Returns (1-indexed row number, matched concept label).
-    Tries exact match first, then fuzzy match (cutoff 0.5).
+    Search order: exact → substring → fuzzy. All comparisons are
+    case-insensitive and accent-insensitive.
     """
     candidates: list[tuple[int, str]] = []
     for i, row in enumerate(all_values):
@@ -92,18 +99,23 @@ def _find_concept_row(all_values: list[list[str]], concept: str) -> tuple[int, s
             continue
         candidates.append((i + 1, label))
 
-    concept_lower = concept.lower()
+    needle = _norm(concept)
 
-    # Exact match (case-insensitive)
+    # 1) Exact match
     for row_num, label in candidates:
-        if label.lower() == concept_lower:
+        if _norm(label) == needle:
             return row_num, label
 
-    # Fuzzy match
-    labels_lower = [label.lower() for _, label in candidates]
-    matches = difflib.get_close_matches(concept_lower, labels_lower, n=1, cutoff=0.5)
+    # 2) Substring match: "restaurante" → "Restaurantes", "super" → "Comida / Supermercado"
+    for row_num, label in candidates:
+        if needle in _norm(label):
+            return row_num, label
+
+    # 3) Fuzzy match as last resort
+    norms = [_norm(label) for _, label in candidates]
+    matches = difflib.get_close_matches(needle, norms, n=1, cutoff=0.5)
     if matches:
-        idx = labels_lower.index(matches[0])
+        idx = norms.index(matches[0])
         return candidates[idx]
 
     raise ValueError(
