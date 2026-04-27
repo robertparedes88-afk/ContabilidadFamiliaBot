@@ -49,8 +49,11 @@ _MONTHS_ES = {
     9: "SEP", 10: "OCT", 11: "NOV", 12: "DIC",
 }
 
-# Keywords que identifican filas de sección (se ignoran como conceptos)
-_SECTION_KEYWORDS = ("ingreso", "fijo", "variable", "total", "ahorro", "---", "===")
+# Palabras que identifican filas de cabecera/total (se ignoran como conceptos)
+_SECTION_KEYWORDS = (
+    "total", "gastos", "ingresos", "ingreso", "fijo", "variable",
+    "concepto", "resumen", "persona", "ahorro", "---", "==="
+)
 
 # Fila 5 del sheet (índice 4 en base 0): cabecera real con los meses ENE..DIC
 _HEADER_ROW_IDX = 4
@@ -89,12 +92,13 @@ def _norm(text: str) -> str:
 def _find_concept_row(all_values: list[list[str]], concept: str) -> tuple[int, str]:
     """
     Returns (1-indexed row number, matched concept label).
+    Reads labels from column B (index 1).
     Search order: exact → substring → fuzzy. All comparisons are
     case-insensitive and accent-insensitive.
     """
     candidates: list[tuple[int, str]] = []
     for i, row in enumerate(all_values):
-        label = row[0].strip() if row else ""
+        label = row[1].strip() if len(row) > 1 else ""
         if not label or _is_section_header(label):
             continue
         candidates.append((i + 1, label))
@@ -140,16 +144,7 @@ def add_gasto_variable(concept: str, amount: float) -> dict:
     month = _current_month_name()
     all_values = sheet.get_all_values()
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
-
-    try:
-        row, matched = _find_concept_row(all_values, concept)
-    except ValueError:
-        # DEBUG TEMPORAL: mostrar primeras 60 filas de columna B (índice 1)
-        col_b = []
-        for i, r in enumerate(all_values[:60]):
-            val = r[1] if len(r) > 1 else "(vacía)"
-            col_b.append(f"F{i+1}: {val}")
-        raise ValueError("DEBUG col B:\n" + "\n".join(col_b))
+    row, matched = _find_concept_row(all_values, concept)
 
     current = _cell_float(all_values[row - 1][col - 1] if len(all_values[row - 1]) >= col else "")
     new_value = round(current + amount, 2)
@@ -196,13 +191,13 @@ def get_resumen() -> dict:
     current_section: Optional[str] = None
 
     for row in all_values[1:]:
-        label = row[0].strip() if row else ""
+        label = row[1].strip() if len(row) > 1 else ""  # columna B
         if not label:
             continue
 
         label_low = label.lower()
 
-        # Detectar cambio de sección
+        # Detectar cambio de sección por palabras clave en col B
         if "ingreso" in label_low:
             current_section = "ingresos"
             continue
