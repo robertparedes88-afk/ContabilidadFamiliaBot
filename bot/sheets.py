@@ -268,6 +268,9 @@ def get_resumen(month: Optional[str] = None) -> dict:
     all_values = sheet.get_all_values()
     col = _find_month_col(all_values[_HEADER_ROW_IDX], month)
 
+    # DEBUG TEMP
+    logger.warning("DEBUG col=%d | fila6=%s | fila7=%s", col, all_values[5], all_values[6])
+
     ingresos         = _read_rows(all_values, *_ROWS_INGRESOS,         col)
     gastos_fijos     = _read_rows(all_values, *_ROWS_GASTOS_FIJOS,     col)
     recurrentes      = _read_rows(all_values, *_ROWS_RECURRENTES,       col)
