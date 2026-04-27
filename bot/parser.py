@@ -8,7 +8,8 @@ class ParsedMessage:
     type: Literal[
         "gasto_variable", "gasto_fijo",
         "gasto_variable_deshacer", "gasto_fijo_deshacer",
-        "ingreso", "consulta_concepto_mes", "unknown"
+        "ingreso", "ingreso_deshacer",
+        "consulta_concepto_mes", "unknown"
     ]
     amount: Optional[float] = None
     concept: Optional[str] = None
@@ -94,6 +95,30 @@ def parse_message(text: str) -> ParsedMessage:
             type="gasto_fijo",
             amount=_parse_amount(m.group(1)),
             concept=concept,
+            month=month,
+        )
+
+    # "Pere cobrado 1478 [mes?] deshacer"
+    m = re.match(r"^(pere)\s+cobrado\s+(\d+(?:[.,]\d+)?)(?:\s+(\w+))?\s+deshacer$", text, re.IGNORECASE)
+    if m:
+        raw_month = m.group(3)
+        month = MONTH_NAMES.get(raw_month.lower()) if raw_month else None
+        return ParsedMessage(
+            type="ingreso_deshacer",
+            amount=_parse_amount(m.group(2)),
+            person="Pere",
+            month=month,
+        )
+
+    # "Alicia cobrada 3838 [mes?] deshacer"
+    m = re.match(r"^(alici[aá])\s+cobrada\s+(\d+(?:[.,]\d+)?)(?:\s+(\w+))?\s+deshacer$", text, re.IGNORECASE)
+    if m:
+        raw_month = m.group(3)
+        month = MONTH_NAMES.get(raw_month.lower()) if raw_month else None
+        return ParsedMessage(
+            type="ingreso_deshacer",
+            amount=_parse_amount(m.group(2)),
+            person="Alícia",
             month=month,
         )
 

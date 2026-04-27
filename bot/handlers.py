@@ -285,6 +285,21 @@ async def message_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             logger.error("gasto_fijo_deshacer error: %s", e)
             await update.message.reply_text(f"❌ Error inesperado: {e}")
 
+    elif parsed.type == "ingreso_deshacer":
+        try:
+            r = subtract_gasto_fijo(parsed.person, parsed.amount, parsed.month)
+            await update.message.reply_text(
+                f"✅ *Ingreso revertido*\n"
+                f"👤 {r['concept']} — {r['month']}\n"
+                f"{_fmt(r['old'])} → *{_fmt(r['new'])}* (-{_fmt(r['delta'])})",
+                parse_mode="Markdown",
+            )
+        except ValueError as e:
+            await update.message.reply_text(f"❌ {e}")
+        except Exception as e:
+            logger.error("ingreso_deshacer error: %s", e)
+            await update.message.reply_text(f"❌ Error inesperado: {e}")
+
     elif parsed.type == "consulta_concepto_mes":
         try:
             r = get_valor_concepto_mes(parsed.concept, parsed.month)
