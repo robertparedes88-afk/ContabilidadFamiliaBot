@@ -139,7 +139,15 @@ def _find_concept_row(all_values: list[list[str]], concept: str) -> tuple[int, s
 
 def _cell_float(value: str) -> float:
     try:
-        return float(str(value).replace(",", ".").replace("€", "").strip())
+        cleaned = (
+            str(value)
+            .replace("€", "")   # quitar símbolo euro
+            .replace(" ", "")   # quitar espacios
+            .replace(".", "")   # quitar puntos de miles
+            .replace(",", ".")  # coma decimal → punto
+            .strip()
+        )
+        return float(cleaned) if cleaned else 0.0
     except (ValueError, AttributeError):
         return 0.0
 
