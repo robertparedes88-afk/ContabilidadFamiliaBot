@@ -47,6 +47,21 @@ function mesActual() { return MES_NOMBRES[new Date().getMonth()]; }
 function colLetra(i) { return String.fromCharCode(65+i); }
 function rangoA1(fila,colIdx) { return `${SHEET_NAME}!${colLetra(colIdx)}${fila}`; }
 
+app.get('/api/test', async (req, res) => {
+  try {
+    const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
+    const key = creds.private_key.replace(/\\n/g, '\n');
+    res.json({
+      ok: true,
+      email: creds.client_email,
+      key_start: key.substring(0, 50),
+      key_end: key.substring(key.length - 50),
+    });
+  } catch (e) {
+    res.json({ ok: false, error: e.message });
+  }
+});
+
 app.post('/api/auth', (req,res) => {
   req.body.pin === PIN ? res.json({ok:true}) : res.status(401).json({ok:false,error:'PIN incorrecto'});
 });
