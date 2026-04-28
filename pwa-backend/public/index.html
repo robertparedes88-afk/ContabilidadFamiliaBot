@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#1D9E75">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Familia">
+  <link rel="manifest" href="manifest.json">
+  <title>Control Familiar 2026</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --accent:       #1D9E75;
+      --accent-dark:  #085041;
+      --accent-light: #E1F5EE;
+      --danger:       #D85A30;
+      --danger-light: #FAECE7;
+      --amber:        #BA7517;
+      --amber-light:  #FAEEDA;
+      --bg:           #F5F5F0;
+      --card:         #FFFFFF;
+      --text:         #1A1A1A;
+      --muted:        #888780;
+      --border:       rgba(0,0,0,0.08);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:           #141412;
+        --card:         #1E1E1C;
+        --text:         #F0EEE8;
+        --muted:        #888780;
+        --border:       rgba(255,255,255,0.08);
+        --accent-light: #04342C;
+        --danger-light: #4A1B0C;
+        --amber-light:  #412402;
+      }
+    }
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, 'Helvetica Neue', sans-serif; }
+    #app { max-width: 430px; margin: 0 auto; min-height: 100dvh; display: flex; flex-direction: column; position: relative; }
+
+    /* ─── PIN ─────────────────────────────────────────── */
+    #pin-screen {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      min-height: 100dvh; gap: 1.8rem; padding: 2rem; background: var(--card);
+    }
+    .pin-logo { width: 68px; height: 68px; background: var(--accent); border-radius: 20px; display: flex; align-items: center; justify-content: center; }
+    .pin-logo svg { width: 34px; height: 34px; fill: white; }
+    .pin-title { font-size: 22px; font-weight: 500; }
+    .pin-sub { font-size: 13px; color: var(--muted); margin-top: 4px; text-align: center; }
+    .pin-dots { display: flex; gap: 18px; }
+    .dot { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent); background: transparent; transition: background .15s; }
+    .dot.on { background: var(--accent); }
+    .pin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; width: 100%; max-width: 280px; }
+    .pk { background: var(--bg); border: none; border-radius: 16px; padding: 20px 0; font-size: 22px; font-weight: 500; color: var(--text); cursor: pointer; transition: transform .1s, background .1s; -webkit-tap-highlight-color: transparent; }
+    .pk:active { transform: scale(.93); background: var(--accent-light); }
+    .pk.ok { background: var(--accent); color: white; font-size: 14px; }
+    .pk.del { font-size: 16px; }
+    .pin-err { color: var(--danger); font-size: 13px; min-height: 18px; }
+
+    /* ─── MAIN ────────────────────────────────────────── */
+    #main { display: none; flex-direction: column; flex: 1; }
+
+    /* ─── SCREENS ─────────────────────────────────────── */
+    .screen { display: none; flex-direction: column; flex: 1; overflow-y: auto; padding-bottom: 80px; }
+    .screen.active { display: flex; }
+
+    /* Header común */
+    .top-bar { padding: 20px 20px 0; display: flex; justify-content: space-between; align-items: center; }
+    .top-title { font-size: 22px; font-weight: 500; }
+    .avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: white; display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 15px; cursor: pointer; }
+
+    /* Dashboard */
+    .hero-card { margin: 16px; background: var(--accent); border-radius: 22px; padding: 22px; color: white; }
+    .hero-label { font-size: 12px; opacity: .75; margin-bottom: 6px; }
+    .hero-amount { font-size: 40px; font-weight: 400; letter-spacing: -1.5px; line-height: 1; }
+    .hero-sub { font-size: 12px; opacity: .7; margin-top: 6px; }
+    .hero-row { display: flex; gap: 10px; margin-top: 16px; }
+    .hero-mini { flex: 1; background: rgba(255,255,255,.18); border-radius: 14px; padding: 12px; }
+    .hero-mini-label { font-size: 11px; opacity: .8; }
+    .hero-mini-val { font-size: 20px; font-weight: 500; margin-top: 2px; }
+
+    .section-title { padding: 4px 20px 8px; font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .list { padding: 0 16px; display: flex; flex-direction: column; gap: 8px; }
+    .item { background: var(--card); border-radius: 16px; padding: 13px 14px; display: flex; align-items: center; gap: 12px; border: 0.5px solid var(--border); }
+    .item-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; background: var(--accent-light); }
+    .item-name { font-size: 14px; font-weight: 500; }
+    .item-meta { font-size: 12px; color: var(--muted); margin-top: 1px; }
+    .item-amount { margin-left: auto; font-size: 15px; font-weight: 500; color: var(--danger); white-space: nowrap; }
+    .item-amount.pos { color: var(--accent); }
+
+    /* Skeleton loader */
+    .skel { background: var(--border); border-radius: 8px; animation: pulse 1.4s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    /* Add screen */
+    .add-wrap { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .form-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .big-num {
+      font-size: 48px; font-weight: 300; letter-spacing: -2px; text-align: center;
+      border: none; background: transparent; color: var(--text); width: 100%; outline: none;
+      padding: 12px 0; border-bottom: 2px solid var(--accent);
+      -webkit-appearance: none; appearance: none;
+    }
+    .cat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .cat-btn {
+      background: var(--bg); border: 0.5px solid var(--border); border-radius: 14px;
+      padding: 11px 4px; display: flex; flex-direction: column; align-items: center; gap: 5px;
+      cursor: pointer; font-size: 11px; color: var(--muted); font-family: inherit;
+      transition: all .15s; -webkit-tap-highlight-color: transparent;
+    }
+    .cat-btn.sel { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); }
+    .cat-emoji { font-size: 22px; line-height: 1; }
+    .text-inp {
+      width: 100%; padding: 13px 14px; background: var(--bg);
+      border: 0.5px solid var(--border); border-radius: 14px;
+      color: var(--text); font-size: 16px; outline: none; font-family: inherit;
+      transition: border-color .15s;
+    }
+    .text-inp:focus { border-color: var(--accent); }
+    .mes-sel {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .mes-btn {
+      padding: 7px 14px; background: var(--bg); border: 0.5px solid var(--border);
+      border-radius: 20px; font-size: 13px; cursor: pointer; color: var(--muted);
+      font-family: inherit; transition: all .15s;
+    }
+    .mes-btn.sel { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); font-weight: 500; }
+    .save-btn {
+      width: 100%; padding: 17px; background: var(--accent); border: none;
+      border-radius: 16px; color: white; font-size: 17px; font-weight: 500;
+      cursor: pointer; font-family: inherit; transition: transform .1s, opacity .1s;
+    }
+    .save-btn:active { transform: scale(.97); opacity: .9; }
+    .save-btn:disabled { opacity: .5; }
+    .toast {
+      background: var(--accent-light); border: 0.5px solid var(--accent);
+      border-radius: 14px; padding: 13px 16px; color: var(--accent-dark);
+      font-size: 14px; font-weight: 500; text-align: center; display: none;
+    }
+    .toast.err { background: var(--danger-light); border-color: var(--danger); color: var(--danger); }
+
+    /* Anual */
+    .anual-wrap { padding: 0 0 8px; }
+    .anual-total { margin: 16px; background: var(--amber-light); border-radius: 16px; padding: 15px 18px; display: flex; justify-content: space-between; align-items: center; }
+    .anual-total-label { font-size: 13px; color: var(--amber); font-weight: 500; }
+    .anual-total-val { font-size: 22px; font-weight: 500; color: var(--amber); }
+    .legend { display: flex; gap: 14px; padding: 0 20px 12px; flex-wrap: wrap; }
+    .leg { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+    .leg-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+    .bars { padding: 0 16px; display: flex; flex-direction: column; gap: 10px; }
+    .bar-row { display: flex; align-items: center; gap: 10px; }
+    .bar-mes { font-size: 12px; color: var(--muted); width: 28px; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 30px; background: var(--bg); border-radius: 8px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 8px; transition: width .9s cubic-bezier(.4,0,.2,1); display: flex; align-items: center; padding-left: 10px; min-width: 4px; }
+    .bar-val { font-size: 12px; font-weight: 500; width: 60px; text-align: right; flex-shrink: 0; }
+
+    /* NAV */
+    nav {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 430px;
+      display: flex; background: var(--card); border-top: 0.5px solid var(--border);
+      padding: 8px 0 calc(8px + env(safe-area-inset-bottom));
+      z-index: 100;
+    }
+    .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; background: none; border: none; color: var(--muted); font-size: 11px; font-weight: 500; cursor: pointer; padding: 4px 0; font-family: inherit; -webkit-tap-highlight-color: transparent; }
+    .nav-btn.active { color: var(--accent); }
+    .nav-btn svg { width: 24px; height: 24px; }
+    .spinner { display: none; width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; margin: 20px auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- PIN -->
+  <div id="pin-screen">
+    <div class="pin-logo">
+      <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+    </div>
+    <div style="text-align:center">
+      <div class="pin-title">Familia Paredes</div>
+      <div class="pin-sub">Introduce tu PIN para continuar</div>
+    </div>
+    <div class="pin-dots" id="dots">
+      <div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot"></div>
+    </div>
+    <div class="pin-grid">
+      <button class="pk" onclick="pk('1')">1</button>
+      <button class="pk" onclick="pk('2')">2</button>
+      <button class="pk" onclick="pk('3')">3</button>
+      <button class="pk" onclick="pk('4')">4</button>
+      <button class="pk" onclick="pk('5')">5</button>
+      <button class="pk" onclick="pk('6')">6</button>
+      <button class="pk" onclick="pk('7')">7</button>
+      <button class="pk" onclick="pk('8')">8</button>
+      <button class="pk" onclick="pk('9')">9</button>
+      <button class="pk del" onclick="pk('del')">⌫</button>
+      <button class="pk" onclick="pk('0')">0</button>
+      <button class="pk ok" onclick="pk('ok')">OK</button>
+    </div>
+    <div class="pin-err" id="pin-err"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+
+    <!-- DASHBOARD -->
+    <div class="screen active" id="s-dash">
+      <div class="top-bar">
+        <div>
+          <div style="font-size:13px;color:var(--muted)" id="greeting">Buenos días 👋</div>
+          <div class="top-title" id="dash-title">Cargando…</div>
+        </div>
+        <div class="avatar" id="av">F</div>
+      </div>
+      <div id="hero-wrap"></div>
+      <div class="section-title" style="margin-top:8px">Gastos variables del mes</div>
+      <div class="list" id="var-list">
+        <div class="skel" style="height:66px;border-radius:16px"></div>
+        <div class="skel" style="height:66px;border-radius:16px"></div>
+        <div class="skel" style="height:66px;border-radius:16px"></div>
+      </div>
+    </div>
+
+    <!-- ADD -->
+    <div class="screen" id="s-add">
+      <div class="top-bar" style="padding-bottom:4px">
+        <div class="top-title">Añadir gasto</div>
+      </div>
+      <div class="add-wrap">
+        <div>
+          <div class="form-label">Cantidad (€)</div>
+          <input class="big-num" type="number" id="inp-amount" placeholder="0" min="0" step="0.01" inputmode="decimal">
+        </div>
+        <div>
+          <div class="form-label">Categoría</div>
+          <div class="cat-grid" id="cat-grid"></div>
+        </div>
+        <div>
+          <div class="form-label">Descripción (opcional)</div>
+          <input class="text-inp" type="text" id="inp-desc" placeholder="ej: Mercadona semana">
+        </div>
+        <div>
+          <div class="form-label">Mes</div>
+          <div class="mes-sel" id="mes-sel"></div>
+        </div>
+        <div class="toast" id="toast"></div>
+        <button class="save-btn" id="save-btn" onclick="guardar()">Guardar gasto</button>
+      </div>
+    </div>
+
+    <!-- ANUAL -->
+    <div class="screen" id="s-anual">
+      <div class="top-bar" style="padding-bottom:4px">
+        <div class="top-title">Resumen 2026</div>
+      </div>
+      <div class="anual-wrap" id="anual-wrap">
+        <div class="spinner" id="spin-anual" style="display:block"></div>
+      </div>
+    </div>
+
+    <!-- NAV -->
+    <nav>
+      <button class="nav-btn active" id="nav-dash" onclick="goTo('dash')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Inicio
+      </button>
+      <button class="nav-btn" id="nav-add" onclick="goTo('add')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+        Añadir
+      </button>
+      <button class="nav-btn" id="nav-anual" onclick="goTo('anual')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg>
+        Anual
+      </button>
+    </nav>
+  </div>
+</div>
+
+<script>
+// ─── Config ──────────────────────────────────────────────────────────────────
+const API = ''; // vacío = mismo origen. En dev: 'http://localhost:3000'
+const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
+const CAT_ICONS = {
+  'comida/supermercado':'🛒','restaurante':'🍽️','gasolina':'⛽',
+  'salud':'💊','ropa':'👕','ocio':'🎭','otros':'📦'
+};
+
+// ─── Estado ──────────────────────────────────────────────────────────────────
+let pin = '';
+let selCat = null;
+let selMes = MESES[new Date().getMonth()];
+let cats = [];
+let anualCargado = false;
+
+// ─── PIN ─────────────────────────────────────────────────────────────────────
+function updateDots() {
+  document.querySelectorAll('.dot').forEach((d,i) => d.classList.toggle('on', i < pin.length));
+}
+
+async function pk(v) {
+  const err = document.getElementById('pin-err');
+  err.textContent = '';
+  if (v === 'del') { pin = pin.slice(0,-1); updateDots(); return; }
+  if (v !== 'ok') pin += v;
+  updateDots();
+  if (pin.length === 4) {
+    try {
+      const r = await fetch(`${API}/api/auth`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({pin}) });
+      const d = await r.json();
+      if (d.ok) {
+        document.getElementById('pin-screen').style.display = 'none';
+        document.getElementById('main').style.display = 'flex';
+        document.getElementById('main').style.flexDirection = 'column';
+        initApp();
+      } else {
+        err.textContent = 'PIN incorrecto, inténtalo de nuevo';
+        pin = ''; updateDots();
+      }
+    } catch(e) {
+      err.textContent = 'Error de conexión';
+      pin = ''; updateDots();
+    }
+  }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+async function initApp() {
+  const h = new Date().getHours();
+  const gr = h < 13 ? 'Buenos días 👋' : h < 20 ? 'Buenas tardes 👋' : 'Buenas noches 👋';
+  document.getElementById('greeting').textContent = gr;
+
+  await Promise.all([loadDash(), loadCats()]);
+  buildMesSel();
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+async function loadDash() {
+  try {
+    const r = await fetch(`${API}/api/dashboard`);
+    const d = await r.json();
+    renderDash(d);
+  } catch(e) {
+    document.getElementById('hero-wrap').innerHTML = '<p style="padding:20px;color:var(--danger)">Error cargando datos</p>';
+  }
+}
+
+function fmt(n) {
+  return n.toLocaleString('es-ES', {minimumFractionDigits:0, maximumFractionDigits:0}) + ' €';
+}
+
+function renderDash(d) {
+  document.getElementById('dash-title').textContent = d.mes + ' 2026';
+  const totalGasto = d.gastosFijos + d.gastosRecurrentes + d.gastosVariables;
+  const pct = Math.min(100, Math.round((totalGasto / d.ingresos) * 100));
+
+  document.getElementById('hero-wrap').innerHTML = `
+    <div class="hero-card">
+      <div class="hero-label">Gastado en ${d.mes}</div>
+      <div class="hero-amount">${fmt(totalGasto)}</div>
+      <div class="hero-sub">de ${fmt(d.ingresos)} ingresos · ${pct}% usado</div>
+      <div class="hero-row">
+        <div class="hero-mini">
+          <div class="hero-mini-label">Ingresos</div>
+          <div class="hero-mini-val">${fmt(d.ingresos)}</div>
+        </div>
+        <div class="hero-mini">
+          <div class="hero-mini-label">${d.ahorro >= 0 ? 'Ahorro' : 'Déficit'}</div>
+          <div class="hero-mini-val">${fmt(Math.abs(d.ahorro))}</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const list = document.getElementById('var-list');
+  if (!d.variables || d.variables.length === 0) {
+    list.innerHTML = '<p style="padding:12px 4px;color:var(--muted);font-size:14px">Sin gastos variables este mes todavía</p>';
+    return;
+  }
+  list.innerHTML = d.variables.map(v => {
+    const key = Object.keys(CAT_ICONS).find(k => v.nombre.toLowerCase().includes(k)) || 'otros';
+    return `
+      <div class="item">
+        <div class="item-icon">${CAT_ICONS[key] || '📦'}</div>
+        <div><div class="item-name">${v.nombre}</div><div class="item-meta">${d.mes} 2026</div></div>
+        <div class="item-amount">-${fmt(v.importe)}</div>
+      </div>`;
+  }).join('');
+}
+
+// ─── Categorías ───────────────────────────────────────────────────────────────
+async function loadCats() {
+  try {
+    const r = await fetch(`${API}/api/categorias`);
+    const d = await r.json();
+    cats = d.categorias;
+    renderCats();
+  } catch(e) {}
+}
+
+function renderCats() {
+  const grid = document.getElementById('cat-grid');
+  grid.innerHTML = cats.map((c,i) => `
+    <button class="cat-btn${i===0?' sel':''}" onclick="selCatFn(this,'${c.key}')">
+      <span class="cat-emoji">${c.emoji}</span>
+      <span>${c.label.split('/')[0].trim()}</span>
+    </button>`).join('');
+  if (cats.length) selCat = cats[0].key;
+}
+
+function selCatFn(btn, key) {
+  document.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  selCat = key;
+}
+
+// ─── Mes selector ─────────────────────────────────────────────────────────────
+function buildMesSel() {
+  const cur = new Date().getMonth();
+  const wrap = document.getElementById('mes-sel');
+  wrap.innerHTML = MESES.map((m,i) => `
+    <button class="mes-btn${m===selMes?' sel':''}" onclick="selMesFn(this,'${m}')">${m}</button>
+  `).join('');
+}
+
+function selMesFn(btn, m) {
+  document.querySelectorAll('.mes-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  selMes = m;
+}
+
+// ─── Guardar gasto ────────────────────────────────────────────────────────────
+async function guardar() {
+  const amount = parseFloat(document.getElementById('inp-amount').value);
+  const toast  = document.getElementById('toast');
+  const btn    = document.getElementById('save-btn');
+
+  toast.className = 'toast';
+  toast.style.display = 'none';
+
+  if (!amount || amount <= 0) { showToast('Introduce una cantidad válida', true); return; }
+  if (!selCat) { showToast('Selecciona una categoría', true); return; }
+
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+
+  try {
+    const r = await fetch(`${API}/api/gasto`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categoria: selCat, importe: amount, mes: selMes }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showToast(d.mensaje, false);
+      document.getElementById('inp-amount').value = '';
+      document.getElementById('inp-desc').value = '';
+      anualCargado = false;
+      setTimeout(loadDash, 500);
+    } else {
+      showToast(d.error || 'Error guardando', true);
+    }
+  } catch(e) {
+    showToast('Error de conexión', true);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'Guardar gasto';
+}
+
+function showToast(msg, isErr) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isErr ? ' err' : '');
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+// ─── Anual ────────────────────────────────────────────────────────────────────
+async function loadAnual() {
+  if (anualCargado) return;
+  const wrap = document.getElementById('anual-wrap');
+  document.getElementById('spin-anual').style.display = 'block';
+  try {
+    const r = await fetch(`${API}/api/anual`);
+    const d = await r.json();
+    renderAnual(d.meses);
+    anualCargado = true;
+  } catch(e) {
+    wrap.innerHTML = '<p style="padding:20px;color:var(--danger)">Error cargando datos anuales</p>';
+  }
+}
+
+function renderAnual(meses) {
+  const maxGasto = Math.max(...meses.map(m => m.totalGasto), 1);
+  const totalAnual = meses.reduce((s,m) => s + m.totalGasto, 0);
+  const mesActualIdx = new Date().getMonth();
+
+  let html = `
+    <div class="anual-total">
+      <div class="anual-total-label">Total gastado 2026</div>
+      <div class="anual-total-val">${fmt(totalAnual)}</div>
+    </div>
+    <div class="legend">
+      <div class="leg"><div class="leg-dot" style="background:#9FE1CB"></div>Meses pasados</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--accent)"></div>Mes actual</div>
+      <div class="leg"><div class="leg-dot" style="background:var(--danger)"></div>Déficit</div>
+    </div>
+    <div class="bars">
+  `;
+
+  meses.forEach((m, i) => {
+    const pct = Math.round((m.totalGasto / maxGasto) * 100);
+    const isCur = i === mesActualIdx;
+    const isOver = m.ahorro < 0 && m.ingresos > 0;
+    const color = isCur ? 'var(--accent)' : isOver ? 'var(--danger)' : (m.totalGasto > 0 ? '#9FE1CB' : 'var(--border)');
+    const valStr = m.totalGasto > 0 ? fmt(m.totalGasto) : '—';
+    html += `
+      <div class="bar-row">
+        <span class="bar-mes">${m.mes}</span>
+        <div class="bar-track">
+          <div class="bar-fill" style="background:${color};width:0%" data-pct="${pct}"></div>
+        </div>
+        <span class="bar-val" style="color:${m.totalGasto>0?'var(--text)':'var(--muted)'}">${valStr}</span>
+      </div>`;
+  });
+
+  html += '</div>';
+  document.getElementById('anual-wrap').innerHTML = html;
+
+  setTimeout(() => {
+    document.querySelectorAll('.bar-fill').forEach(b => {
+      b.style.width = b.dataset.pct + '%';
+    });
+  }, 60);
+}
+
+// ─── Navegación ───────────────────────────────────────────────────────────────
+function goTo(s) {
+  document.querySelectorAll('.screen').forEach(sc => sc.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(nb => nb.classList.remove('active'));
+  document.getElementById('s-' + s).classList.add('active');
+  document.getElementById('nav-' + s).classList.add('active');
+  if (s === 'anual') loadAnual();
+}
+
+// ─── Service Worker ───────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
