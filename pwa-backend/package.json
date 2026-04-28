@@ -4,7 +4,10 @@
   "description": "Backend para la PWA de contabilidad familiar",
   "main": "server.js",
   "scripts": {
-    "start": "node --openssl-legacy-provider server.js"
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": "18.x"
   },
   "dependencies": {
     "cors": "^2.8.5",
