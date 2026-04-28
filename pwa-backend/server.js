@@ -1,5 +1,6 @@
 const express = require('express');
 const { google } = require('googleapis');
+const { JWT } = require('google-auth-library');
 const cors = require('cors');
 const path = require('path');
 
@@ -27,9 +28,12 @@ const FILAS_VARIABLES = {
 
 function getSheetsClient() {
   const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
-  // Railway stores \n as literal \\n in env vars; normalize before passing to OpenSSL
-  if (creds.private_key) creds.private_key = creds.private_key.replace(/\\n/g, '\n');
-  const auth = new google.auth.GoogleAuth({ credentials: creds, scopes: ['https://www.googleapis.com/auth/spreadsheets'] });
+  const key = creds.private_key.replace(/\\n/g, '\n');
+  const auth = new JWT({
+    email: creds.client_email,
+    key,
+    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  });
   return google.sheets({ version: 'v4', auth });
 }
 function cellToFloat(val) {
