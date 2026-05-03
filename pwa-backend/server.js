@@ -27,7 +27,13 @@ const FILAS_VARIABLES = {
 
 async function getAccessToken() {
   const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
-  const privateKey = creds.private_key.replace(/\\n/g, '\n');
+  let privateKey = creds.private_key;
+  // Normalizar saltos de línea
+  privateKey = privateKey.replace(/\\n/g, '\n');
+  // Asegurar que empieza y termina correctamente
+  if (!privateKey.includes('-----BEGIN RSA PRIVATE KEY-----') && !privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+    throw new Error('private_key format invalid');
+  }
   const now = Math.floor(Date.now() / 1000);
   const payload = {
     iss: creds.client_email,
@@ -43,6 +49,7 @@ async function getAccessToken() {
     body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${token}`,
   });
   const data = await resp.json();
+  if (!data.access_token) throw new Error(JSON.stringify(data));
   return data.access_token;
 }
 
