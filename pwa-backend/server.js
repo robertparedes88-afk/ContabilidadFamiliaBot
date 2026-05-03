@@ -4,7 +4,7 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -144,6 +144,82 @@ app.post('/api/gasto', async (req,res) => {
     const nuevo = anterior + parseFloat(importe);
     await sheetsUpdate(rango, [[floatToCell(nuevo)]]);
     res.json({ok:true,categoria,mes,anterior,nuevo,mensaje:`✅ ${importe}€ añadidos a ${categoria} (${mes}). Total: ${nuevo.toFixed(2)}€`});
+  } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
+});
+
+app.post('/api/gasto/borrar', async (req,res) => {
+  try {
+    const {categoria,importe,mes:mesParam} = req.body;
+    if (!categoria||!importe) return res.status(400).json({error:'Faltan datos'});
+    const mes = (mesParam||mesActual()).toUpperCase();
+    const colIdx = MES_COLS[mes];
+    if (!colIdx) return res.status(400).json({error:'Mes inválido'});
+    const fila = FILAS_VARIABLES[categoria.toLowerCase().trim()];
+    if (!fila) return res.status(400).json({error:`Categoría desconocida: ${categoria}`});
+    const rango = rangoA1(fila, colIdx);
+    const r = await sheetsRequest(rango);
+    const anterior = cellToFloat(r.values?.[0]?.[0]);
+    const nuevo = Math.max(0, anterior - parseFloat(importe));
+    await sheetsUpdate(rango, [[floatToCell(nuevo)]]);
+    res.json({ok:true,categoria,mes,anterior,nuevo,mensaje:`✅ ${importe}€ eliminados de ${categoria} (${mes}). Total: ${nuevo.toFixed(2)}€`});
+  } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
+});
+
+app.post('/api/gasto/editar', async (req,res) => {
+  try {
+    const {categoria,mes:mesParam,importe_anterior,importe_nuevo} = req.body;
+    if (!categoria||importe_anterior==null||importe_nuevo==null) return res.status(400).json({error:'Faltan datos'});
+    const mes = (mesParam||mesActual()).toUpperCase();
+    const colIdx = MES_COLS[mes];
+    if (!colIdx) return res.status(400).json({error:'Mes inválido'});
+    const fila = FILAS_VARIABLES[categoria.toLowerCase().trim()];
+    if (!fila) return res.status(400).json({error:`Categoría desconocida: ${categoria}`});
+    const rango = rangoA1(fila, colIdx);
+    const r = await sheetsRequest(rango);
+    const actual = cellToFloat(r.values?.[0]?.[0]);
+    const diff = parseFloat(importe_nuevo) - parseFloat(importe_anterior);
+    const nuevo = Math.max(0, actual + diff);
+    await sheetsUpdate(rango, [[floatToCell(nuevo)]]);
+    res.json({ok:true,categoria,mes,anterior:actual,nuevo,mensaje:`✅ ${categoria} (${mes}) actualizado a ${nuevo.toFixed(2)}€`});
+  } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
+});
+
+app.post('/api/ticket', async (req,res) => {
+  try {
+    const {imagen} = req.body;
+    if (!imagen) return res.status(400).json({error:'Falta imagen'});
+    let mediaType = 'image/jpeg';
+    let imageData = imagen;
+    if (imagen.startsWith('data:')) {
+      const match = imagen.match(/^data:([^;]+);base64,(.+)$/s);
+      if (match) { mediaType = match[1]; imageData = match[2]; }
+    }
+    const response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1024,
+        system: 'Eres un asistente de contabilidad familiar. Analiza el ticket y devuelve SOLO un JSON con esta estructura: {"total": number, "items": [{"descripcion": string, "importe": number, "categoria": string}]} donde categoria es una de: comida/supermercado, restaurante, gasolina, salud, ropa, ocio, otros',
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageData } },
+            { type: 'text', text: 'Analiza este ticket y devuelve el JSON solicitado.' },
+          ],
+        }],
+      }),
+    });
+    const data = await response.json();
+    if (data.error) return res.status(500).json({error: data.error.message});
+    const text = data.content?.[0]?.text || '';
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return res.status(500).json({error:'No se pudo parsear la respuesta', raw:text});
+    res.json(JSON.parse(jsonMatch[0]));
   } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
 });
 

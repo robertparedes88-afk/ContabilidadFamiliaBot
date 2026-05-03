@@ -87,8 +87,16 @@
     .item-icon { width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; background: var(--accent-light); }
     .item-name { font-size: 14px; font-weight: 500; }
     .item-meta { font-size: 12px; color: var(--muted); margin-top: 1px; }
-    .item-amount { margin-left: auto; font-size: 15px; font-weight: 500; color: var(--danger); white-space: nowrap; }
+    .item-amount { font-size: 15px; font-weight: 500; color: var(--danger); white-space: nowrap; }
     .item-amount.pos { color: var(--accent); }
+    .item-actions { display: flex; gap: 5px; flex-shrink: 0; margin-left: 6px; }
+    .icon-btn {
+      background: var(--bg); border: 0.5px solid var(--border); border-radius: 8px;
+      width: 30px; height: 30px; cursor: pointer; font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+      -webkit-tap-highlight-color: transparent; padding: 0; transition: transform .1s;
+    }
+    .icon-btn:active { transform: scale(.88); }
 
     /* Skeleton loader */
     .skel { background: var(--border); border-radius: 8px; animation: pulse 1.4s ease-in-out infinite; }
@@ -119,9 +127,7 @@
       transition: border-color .15s;
     }
     .text-inp:focus { border-color: var(--accent); }
-    .mes-sel {
-      display: flex; gap: 6px; flex-wrap: wrap;
-    }
+    .mes-sel { display: flex; gap: 6px; flex-wrap: wrap; }
     .mes-btn {
       padding: 7px 14px; background: var(--bg); border: 0.5px solid var(--border);
       border-radius: 20px; font-size: 13px; cursor: pointer; color: var(--muted);
@@ -141,6 +147,36 @@
       font-size: 14px; font-weight: 500; text-align: center; display: none;
     }
     .toast.err { background: var(--danger-light); border-color: var(--danger); color: var(--danger); }
+
+    /* Ticket */
+    .ticket-section { border-top: 0.5px solid var(--border); padding-top: 16px; }
+    .ticket-btn {
+      width: 100%; padding: 14px; background: var(--bg);
+      border: 1.5px dashed var(--border); border-radius: 16px;
+      color: var(--muted); font-size: 15px; cursor: pointer; font-family: inherit;
+      transition: all .15s; -webkit-tap-highlight-color: transparent;
+    }
+    .ticket-btn:active { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); }
+    .ticket-items { display: flex; flex-direction: column; gap: 10px; }
+    .ticket-item {
+      background: var(--bg); border-radius: 14px; padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 8px; border: 0.5px solid var(--border);
+    }
+    .ticket-item-row { display: flex; gap: 8px; align-items: center; }
+    .ticket-item-label { font-size: 12px; color: var(--muted); flex-shrink: 0; width: 62px; }
+    .ticket-item-inp {
+      flex: 1; padding: 7px 10px; background: var(--card);
+      border: 0.5px solid var(--border); border-radius: 10px;
+      font-size: 14px; color: var(--text); font-family: inherit; outline: none;
+    }
+    .ticket-item-inp:focus { border-color: var(--accent); }
+    .confirm-btn {
+      width: 100%; padding: 15px; background: var(--accent); border: none;
+      border-radius: 16px; color: white; font-size: 16px; font-weight: 500;
+      cursor: pointer; font-family: inherit; transition: transform .1s, opacity .1s;
+    }
+    .confirm-btn:active { transform: scale(.97); opacity: .9; }
+    .confirm-btn:disabled { opacity: .5; }
 
     /* Anual */
     .anual-wrap { padding: 0 0 8px; }
@@ -249,6 +285,20 @@
         </div>
         <div class="toast" id="toast"></div>
         <button class="save-btn" id="save-btn" onclick="guardar()">Guardar gasto</button>
+
+        <!-- Ticket -->
+        <div class="ticket-section">
+          <div class="form-label">O escanea un ticket</div>
+          <input type="file" id="ticket-file" accept="image/*" capture="environment" style="display:none" onchange="procesarTicket(this)">
+          <button class="ticket-btn" onclick="document.getElementById('ticket-file').click()">📸 Subir ticket</button>
+          <div class="spinner" id="ticket-spinner"></div>
+          <div id="ticket-result" style="display:none;margin-top:12px">
+            <div style="font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Items detectados</div>
+            <div class="ticket-items" id="ticket-items"></div>
+            <div class="toast" id="ticket-toast" style="margin-top:10px"></div>
+            <button class="confirm-btn" id="confirm-ticket-btn" onclick="confirmarTicket()" style="margin-top:12px">✅ Guardar todos</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -282,7 +332,7 @@
 
 <script>
 // ─── Config ──────────────────────────────────────────────────────────────────
-const API = ''; // vacío = mismo origen. En dev: 'http://localhost:3000'
+const API = '';
 const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 const CAT_ICONS = {
   'comida/supermercado':'🛒','restaurante':'🍽️','gasolina':'⛽',
@@ -295,6 +345,7 @@ let selCat = null;
 let selMes = MESES[new Date().getMonth()];
 let cats = [];
 let anualCargado = false;
+let ticketItems = [];
 
 // ─── PIN ─────────────────────────────────────────────────────────────────────
 function updateDots() {
@@ -332,7 +383,6 @@ async function initApp() {
   const h = new Date().getHours();
   const gr = h < 13 ? 'Buenos días 👋' : h < 20 ? 'Buenas tardes 👋' : 'Buenas noches 👋';
   document.getElementById('greeting').textContent = gr;
-
   await Promise.all([loadDash(), loadCats()]);
   buildMesSel();
 }
@@ -380,15 +430,55 @@ function renderDash(d) {
     list.innerHTML = '<p style="padding:12px 4px;color:var(--muted);font-size:14px">Sin gastos variables este mes todavía</p>';
     return;
   }
+  const mes = d.mes;
   list.innerHTML = d.variables.map(v => {
     const key = Object.keys(CAT_ICONS).find(k => v.nombre.toLowerCase().includes(k)) || 'otros';
     return `
       <div class="item">
         <div class="item-icon">${CAT_ICONS[key] || '📦'}</div>
-        <div><div class="item-name">${v.nombre}</div><div class="item-meta">${d.mes} 2026</div></div>
-        <div class="item-amount">-${fmt(v.importe)}</div>
+        <div style="flex:1"><div class="item-name">${v.nombre}</div><div class="item-meta">${mes} 2026</div></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="item-amount">-${fmt(v.importe)}</div>
+          <div class="item-actions">
+            <button class="icon-btn" onclick="editarGasto('${key}',${v.importe},'${mes}')" title="Editar">✏️</button>
+            <button class="icon-btn" onclick="borrarGasto('${key}',${v.importe},'${mes}')" title="Borrar">🗑️</button>
+          </div>
+        </div>
       </div>`;
   }).join('');
+}
+
+// ─── Borrar gasto ─────────────────────────────────────────────────────────────
+async function borrarGasto(categoria, importe, mes) {
+  if (!confirm(`¿Eliminar ${importe.toFixed(2)}€ de ${categoria} (${mes})?`)) return;
+  try {
+    const r = await fetch(`${API}/api/gasto/borrar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categoria, importe, mes }),
+    });
+    const d = await r.json();
+    if (d.ok) { anualCargado = false; loadDash(); }
+    else alert(d.error || 'Error al borrar');
+  } catch(e) { alert('Error de conexión'); }
+}
+
+// ─── Editar gasto ─────────────────────────────────────────────────────────────
+async function editarGasto(categoria, importeActual, mes) {
+  const input = prompt(`Nuevo importe para ${categoria} (${mes})\nActual: ${importeActual.toFixed(2)} €`, importeActual.toFixed(2));
+  if (input === null) return;
+  const importe_nuevo = parseFloat(input);
+  if (isNaN(importe_nuevo) || importe_nuevo < 0) { alert('Importe inválido'); return; }
+  try {
+    const r = await fetch(`${API}/api/gasto/editar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ categoria, mes, importe_anterior: importeActual, importe_nuevo }),
+    });
+    const d = await r.json();
+    if (d.ok) { anualCargado = false; loadDash(); }
+    else alert(d.error || 'Error al editar');
+  } catch(e) { alert('Error de conexión'); }
 }
 
 // ─── Categorías ───────────────────────────────────────────────────────────────
@@ -419,9 +509,8 @@ function selCatFn(btn, key) {
 
 // ─── Mes selector ─────────────────────────────────────────────────────────────
 function buildMesSel() {
-  const cur = new Date().getMonth();
   const wrap = document.getElementById('mes-sel');
-  wrap.innerHTML = MESES.map((m,i) => `
+  wrap.innerHTML = MESES.map(m => `
     <button class="mes-btn${m===selMes?' sel':''}" onclick="selMesFn(this,'${m}')">${m}</button>
   `).join('');
 }
@@ -477,6 +566,108 @@ function showToast(msg, isErr) {
   t.className = 'toast' + (isErr ? ' err' : '');
   t.style.display = 'block';
   setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
+// ─── Ticket ───────────────────────────────────────────────────────────────────
+async function procesarTicket(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const spinner = document.getElementById('ticket-spinner');
+  const result  = document.getElementById('ticket-result');
+  result.style.display = 'none';
+  spinner.style.display = 'block';
+
+  try {
+    const dataUrl = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result);
+      reader.onerror = rej;
+      reader.readAsDataURL(file);
+    });
+
+    const r = await fetch(`${API}/api/ticket`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imagen: dataUrl }),
+    });
+    const data = await r.json();
+
+    if (data.error) { showToast(data.error, true); return; }
+
+    ticketItems = (data.items || []).filter(i => i.importe > 0);
+    if (!ticketItems.length) { showToast('No se detectaron items en el ticket', true); return; }
+
+    renderTicketItems();
+    result.style.display = 'block';
+  } catch(e) {
+    showToast('Error procesando ticket', true);
+  } finally {
+    spinner.style.display = 'none';
+    input.value = '';
+  }
+}
+
+function renderTicketItems() {
+  const catsAvail = cats.length
+    ? cats
+    : Object.entries(CAT_ICONS).map(([key, emoji]) => ({key, emoji, label: key}));
+  const catOptions = catsAvail.map(c => `<option value="${c.key}">${c.emoji} ${c.label}</option>`).join('');
+
+  document.getElementById('ticket-items').innerHTML = ticketItems.map((item, i) => `
+    <div class="ticket-item">
+      <div style="font-size:14px;font-weight:500">${item.descripcion}</div>
+      <div class="ticket-item-row">
+        <span class="ticket-item-label">Importe</span>
+        <input class="ticket-item-inp" type="number" step="0.01" min="0" style="max-width:100px"
+          value="${Number(item.importe).toFixed(2)}"
+          onchange="ticketItems[${i}].importe = parseFloat(this.value) || 0">
+        <span style="font-size:14px;color:var(--muted)">€</span>
+      </div>
+      <div class="ticket-item-row">
+        <span class="ticket-item-label">Categoría</span>
+        <select class="ticket-item-inp" onchange="ticketItems[${i}].categoria = this.value">
+          ${catOptions.replace(`value="${item.categoria}"`, `value="${item.categoria}" selected`)}
+        </select>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function confirmarTicket() {
+  const btn = document.getElementById('confirm-ticket-btn');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+
+  let ok = 0, errCount = 0;
+  for (const item of ticketItems) {
+    try {
+      const r = await fetch(`${API}/api/gasto`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoria: item.categoria, importe: item.importe, mes: selMes }),
+      });
+      const d = await r.json();
+      d.ok ? ok++ : errCount++;
+    } catch(e) { errCount++; }
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✅ Guardar todos';
+
+  const tkt = document.getElementById('ticket-toast');
+  tkt.textContent = errCount ? `${ok} guardados, ${errCount} errores` : `✅ ${ok} gastos guardados`;
+  tkt.className = 'toast' + (errCount ? ' err' : '');
+  tkt.style.display = 'block';
+  setTimeout(() => { tkt.style.display = 'none'; }, 3000);
+
+  if (ok > 0) {
+    anualCargado = false;
+    setTimeout(() => {
+      loadDash();
+      document.getElementById('ticket-result').style.display = 'none';
+    }, 1500);
+  }
 }
 
 // ─── Anual ────────────────────────────────────────────────────────────────────
