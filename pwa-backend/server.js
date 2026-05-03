@@ -1,6 +1,5 @@
 const express = require('express');
-const { google } = require('googleapis');
-const { JWT } = require('google-auth-library');
+const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const path = require('path');
 
@@ -26,16 +25,55 @@ const FILAS_VARIABLES = {
   'otros':43,
 };
 
-function getSheetsClient() {
+async function getAccessToken() {
   const creds = JSON.parse(process.env.GOOGLE_CREDENTIALS_JSON);
-  const key = creds.private_key.replace(/\\n/g, '\n');
-  const auth = new JWT({
-    email: creds.client_email,
-    key,
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+  const privateKey = creds.private_key.replace(/\\n/g, '\n');
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    iss: creds.client_email,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now,
+  };
+  const token = jwt.sign(payload, privateKey, { algorithm: 'RS256' });
+  const resp = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${token}`,
   });
-  return google.sheets({ version: 'v4', auth });
+  const data = await resp.json();
+  return data.access_token;
 }
+
+async function sheetsRequest(range, method = 'GET', body = null) {
+  const token = await getAccessToken();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.SPREADSHEET_ID}/values/${encodeURIComponent(range)}`;
+  const opts = { method, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(url, opts);
+  return r.json();
+}
+
+async function sheetsBatchGet(ranges) {
+  const token = await getAccessToken();
+  const qs = ranges.map(r => `ranges=${encodeURIComponent(r)}`).join('&');
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.SPREADSHEET_ID}/values:batchGet?${qs}`;
+  const r = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  return r.json();
+}
+
+async function sheetsUpdate(range, values) {
+  const token = await getAccessToken();
+  const url = `https://sheets.googleapis.com/v4/spreadsheets/${process.env.SPREADSHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+  const r = await fetch(url, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values }),
+  });
+  return r.json();
+}
+
 function cellToFloat(val) {
   if (!val || val === '-' || val === '') return 0;
   return parseFloat(String(val).replace(/\./g,'').replace(',','.').replace(/[^0-9.\-]/g,'')) || 0;
@@ -57,11 +95,10 @@ app.get('/api/dashboard', async (req,res) => {
     const colIdx = MES_COLS[mes];
     if (!colIdx) return res.status(400).json({error:'Mes inválido'});
     const col = colLetra(colIdx);
-    const sheets = getSheetsClient();
-    const {data} = await sheets.spreadsheets.values.batchGet({
-      spreadsheetId: SPREADSHEET_ID,
-      ranges: [`${SHEET_NAME}!${col}49`,`${SHEET_NAME}!${col}50`,`${SHEET_NAME}!${col}51`,`${SHEET_NAME}!${col}52`,`${SHEET_NAME}!${col}53`,`${SHEET_NAME}!B37:${col}43`],
-    });
+    const data = await sheetsBatchGet([
+      `${SHEET_NAME}!${col}49`,`${SHEET_NAME}!${col}50`,`${SHEET_NAME}!${col}51`,
+      `${SHEET_NAME}!${col}52`,`${SHEET_NAME}!${col}53`,`${SHEET_NAME}!B37:${col}43`,
+    ]);
     const v = data.valueRanges;
     const get = i => v[i]?.values?.[0]?.[0] || '0';
     const variables = (v[5]?.values||[]).map(row=>({nombre:row[0]||'',importe:cellToFloat(row[row.length-1])})).filter(r=>r.nombre&&r.importe>0);
@@ -71,11 +108,9 @@ app.get('/api/dashboard', async (req,res) => {
 
 app.get('/api/anual', async (req,res) => {
   try {
-    const sheets = getSheetsClient();
-    const {data} = await sheets.spreadsheets.values.batchGet({
-      spreadsheetId: SPREADSHEET_ID,
-      ranges: ['D49:O49','D50:O50','D51:O51','D52:O52','D53:O53'].map(r=>`${SHEET_NAME}!${r}`),
-    });
+    const data = await sheetsBatchGet(
+      ['D49:O49','D50:O50','D51:O51','D52:O52','D53:O53'].map(r=>`${SHEET_NAME}!${r}`)
+    );
     const rows = data.valueRanges.map(r=>r.values?.[0]||[]);
     const meses = MES_NOMBRES.map((m,i)=>({
       mes:m, ingresos:cellToFloat(rows[0][i]), fijos:cellToFloat(rows[1][i]),
@@ -96,12 +131,11 @@ app.post('/api/gasto', async (req,res) => {
     if (!colIdx) return res.status(400).json({error:'Mes inválido'});
     const fila = FILAS_VARIABLES[categoria.toLowerCase().trim()];
     if (!fila) return res.status(400).json({error:`Categoría desconocida: ${categoria}`});
-    const sheets = getSheetsClient();
     const rango = rangoA1(fila, colIdx);
-    const {data:r} = await sheets.spreadsheets.values.get({spreadsheetId:SPREADSHEET_ID,range:rango});
+    const r = await sheetsRequest(rango);
     const anterior = cellToFloat(r.values?.[0]?.[0]);
     const nuevo = anterior + parseFloat(importe);
-    await sheets.spreadsheets.values.update({spreadsheetId:SPREADSHEET_ID,range:rango,valueInputOption:'USER_ENTERED',requestBody:{values:[[floatToCell(nuevo)]]}});
+    await sheetsUpdate(rango, [[floatToCell(nuevo)]]);
     res.json({ok:true,categoria,mes,anterior,nuevo,mensaje:`✅ ${importe}€ añadidos a ${categoria} (${mes}). Total: ${nuevo.toFixed(2)}€`});
   } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
 });
