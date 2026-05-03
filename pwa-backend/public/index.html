@@ -437,7 +437,7 @@ function renderDash(d) {
       <div class="item">
         <div class="item-icon">${CAT_ICONS[key] || '📦'}</div>
         <div style="flex:1"><div class="item-name">${v.nombre}</div><div class="item-meta">${mes} 2026</div></div>
-        <div style="display:flex;align-items:center;gap:6px">
+        <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <div class="item-amount">-${fmt(v.importe)}</div>
           <div class="item-actions">
             <button class="icon-btn" onclick="editarGasto('${key}',${v.importe},'${mes}')" title="Editar">✏️</button>
