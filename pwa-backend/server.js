@@ -157,6 +157,25 @@ app.get('/api/categorias', (_,res) => res.json({categorias:[
   {key:'otros',label:'Otros',emoji:'📦'},
 ]}));
 
+app.get('/api/debug-key', async (req,res) => {
+  try {
+    const raw = process.env.GOOGLE_CREDENTIALS_JSON;
+    const creds = JSON.parse(raw);
+    const key = creds.private_key;
+    const keyNorm = key.replace(/\\n/g, '\n');
+    res.json({
+      raw_length: key.length,
+      norm_length: keyNorm.length,
+      starts_with: keyNorm.substring(0, 40),
+      ends_with: keyNorm.substring(keyNorm.length - 40),
+      newline_count: (keyNorm.match(/\n/g) || []).length,
+      client_email: creds.client_email,
+    });
+  } catch(e) {
+    res.json({ error: e.message });
+  }
+});
+
 app.get('*', (_,res) => res.sendFile(path.join(__dirname,'public','index.html')));
 
 const PORT = process.env.PORT || 3000;
