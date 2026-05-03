@@ -440,17 +440,30 @@ function renderDash(d) {
         <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
           <div class="item-amount">-${fmt(v.importe)}</div>
           <div class="item-actions">
-            <button class="icon-btn" onclick="editarGasto('${key}',${v.importe},'${mes}')" title="Editar">✏️</button>
-            <button class="icon-btn" onclick="borrarGasto('${key}',${v.importe},'${mes}')" title="Borrar">🗑️</button>
+            <button class="icon-btn" onclick="editarGasto('${v.nombre.replace(/'/g,"\\'")}',${v.importe},'${mes}')" title="Editar">✏️</button>
+            <button class="icon-btn" onclick="borrarGasto('${v.nombre.replace(/'/g,"\\'")}',${v.importe},'${mes}')" title="Borrar">🗑️</button>
           </div>
         </div>
       </div>`;
   }).join('');
 }
 
+// ─── Mapeo nombre hoja → clave categoría ────────────────────────────────────
+function nombreACat(nombre) {
+  const n = nombre.toLowerCase();
+  if (n.includes('comida') || n.includes('supermercado')) return 'comida/supermercado';
+  if (n.includes('restaurante'))                          return 'restaurante';
+  if (n.includes('gasolina'))                             return 'gasolina';
+  if (n.includes('salud') || n.includes('farmacia'))      return 'salud';
+  if (n.includes('ropa'))                                 return 'ropa';
+  if (n.includes('ocio') || n.includes('entretenimiento'))return 'ocio';
+  return 'otros';
+}
+
 // ─── Borrar gasto ─────────────────────────────────────────────────────────────
-async function borrarGasto(categoria, importe, mes) {
-  if (!confirm(`¿Eliminar ${importe.toFixed(2)}€ de ${categoria} (${mes})?`)) return;
+async function borrarGasto(nombre, importe, mes) {
+  const categoria = nombreACat(nombre);
+  if (!confirm(`¿Eliminar ${importe.toFixed(2)}€ de ${nombre} (${mes})?`)) return;
   try {
     const r = await fetch(`${API}/api/gasto/borrar`, {
       method: 'POST',
@@ -464,8 +477,9 @@ async function borrarGasto(categoria, importe, mes) {
 }
 
 // ─── Editar gasto ─────────────────────────────────────────────────────────────
-async function editarGasto(categoria, importeActual, mes) {
-  const input = prompt(`Nuevo importe para ${categoria} (${mes})\nActual: ${importeActual.toFixed(2)} €`, importeActual.toFixed(2));
+async function editarGasto(nombre, importeActual, mes) {
+  const categoria = nombreACat(nombre);
+  const input = prompt(`Nuevo importe para ${nombre} (${mes})\nActual: ${importeActual.toFixed(2)} €`, importeActual.toFixed(2));
   if (input === null) return;
   const importe_nuevo = parseFloat(input);
   if (isNaN(importe_nuevo) || importe_nuevo < 0) { alert('Importe inválido'); return; }
