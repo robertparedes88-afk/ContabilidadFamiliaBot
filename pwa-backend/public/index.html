@@ -178,6 +178,23 @@
     .confirm-btn:active { transform: scale(.97); opacity: .9; }
     .confirm-btn:disabled { opacity: .5; }
 
+    /* Persona selector */
+    .pers-btn {
+      background: var(--bg); border: 0.5px solid var(--border); border-radius: 14px;
+      padding: 14px 4px; display: flex; flex-direction: column; align-items: center; gap: 5px;
+      cursor: pointer; font-size: 13px; color: var(--muted); font-family: inherit;
+      transition: all .15s; -webkit-tap-highlight-color: transparent; flex: 1;
+    }
+    .pers-btn.sel { background: var(--accent-light); border-color: var(--accent); color: var(--accent-dark); font-weight: 500; }
+    .pers-btn:active { transform: scale(.97); }
+    .ing-card {
+      background: var(--accent-light); border-radius: 16px; padding: 14px 16px; flex: 1;
+      display: flex; flex-direction: column; gap: 4px;
+    }
+    .ing-card-label { font-size: 11px; color: var(--accent-dark); font-weight: 500; }
+    .ing-card-val   { font-size: 22px; font-weight: 500; color: var(--accent); }
+    .ing-card-sub   { font-size: 11px; color: var(--muted); }
+
     /* Anual */
     .anual-wrap { padding: 0 0 8px; }
     .anual-total { margin: 16px; background: var(--amber-light); border-radius: 16px; padding: 15px 18px; display: flex; justify-content: space-between; align-items: center; }
@@ -302,6 +319,39 @@
       </div>
     </div>
 
+    <!-- INGRESOS -->
+    <div class="screen" id="s-ing">
+      <div class="top-bar" style="padding-bottom:4px">
+        <div class="top-title">Ingresos</div>
+      </div>
+      <div class="add-wrap">
+        <div id="ing-cards">
+          <div class="skel" style="height:80px;border-radius:16px"></div>
+        </div>
+        <div style="border-top:0.5px solid var(--border);padding-top:16px;display:flex;flex-direction:column;gap:16px">
+          <div class="form-label" style="margin-bottom:0">Actualizar ingreso</div>
+          <div style="display:flex;gap:8px">
+            <button class="pers-btn sel" id="btn-pere" onclick="selPersonaFn(this,'pere')">
+              <span style="font-size:22px">👤</span><span>Pere</span>
+            </button>
+            <button class="pers-btn" id="btn-alicia" onclick="selPersonaFn(this,'alicia')">
+              <span style="font-size:22px">👤</span><span>Alicia</span>
+            </button>
+          </div>
+          <div>
+            <div class="form-label">Cantidad (€)</div>
+            <input class="big-num" type="number" id="ing-amount" placeholder="0" min="0" step="0.01" inputmode="decimal">
+          </div>
+          <div>
+            <div class="form-label">Mes</div>
+            <div class="mes-sel" id="mes-sel-ing"></div>
+          </div>
+          <div class="toast" id="ing-toast"></div>
+          <button class="save-btn" id="ing-save-btn" onclick="guardarIngreso()">💰 Guardar ingreso</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ANUAL -->
     <div class="screen" id="s-anual">
       <div class="top-bar" style="padding-bottom:4px">
@@ -321,6 +371,10 @@
       <button class="nav-btn" id="nav-add" onclick="goTo('add')">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
         Añadir
+      </button>
+      <button class="nav-btn" id="nav-ing" onclick="goTo('ing')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 18v1c0 1.1-.9 2-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14c1.1 0 2 .9 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
+        Ingresos
       </button>
       <button class="nav-btn" id="nav-anual" onclick="goTo('anual')">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg>
@@ -346,6 +400,8 @@ let selMes = MESES[new Date().getMonth()];
 let cats = [];
 let anualCargado = false;
 let ticketItems = [];
+let selPersona = 'pere';
+let selMesIng = MESES[new Date().getMonth()];
 
 // ─── PIN ─────────────────────────────────────────────────────────────────────
 function updateDots() {
@@ -385,6 +441,7 @@ async function initApp() {
   document.getElementById('greeting').textContent = gr;
   await Promise.all([loadDash(), loadCats()]);
   buildMesSel();
+  buildMesSelIng();
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -530,7 +587,7 @@ function buildMesSel() {
 }
 
 function selMesFn(btn, m) {
-  document.querySelectorAll('.mes-btn').forEach(b => b.classList.remove('sel'));
+  document.querySelectorAll('#mes-sel .mes-btn').forEach(b => b.classList.remove('sel'));
   btn.classList.add('sel');
   selMes = m;
 }
@@ -684,6 +741,97 @@ async function confirmarTicket() {
   }
 }
 
+// ─── Ingresos ────────────────────────────────────────────────────────────────
+async function loadIngresos() {
+  document.getElementById('ing-cards').innerHTML = '<div class="skel" style="height:80px;border-radius:16px"></div>';
+  try {
+    const r = await fetch(`${API}/api/ingresos?mes=${selMesIng}`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    renderIngresos(d);
+  } catch(e) {
+    document.getElementById('ing-cards').innerHTML = '<p style="padding:12px 4px;color:var(--danger);font-size:14px">Error cargando ingresos</p>';
+  }
+}
+
+function renderIngresos(d) {
+  const total = d.pere + d.alicia;
+  document.getElementById('ing-cards').innerHTML = `
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <div class="ing-card">
+        <div class="ing-card-label">👤 Pere</div>
+        <div class="ing-card-val">${fmt(d.pere)}</div>
+        <div class="ing-card-sub">${d.mes} 2026</div>
+      </div>
+      <div class="ing-card">
+        <div class="ing-card-label">👤 Alicia</div>
+        <div class="ing-card-val">${fmt(d.alicia)}</div>
+        <div class="ing-card-sub">${d.mes} 2026</div>
+      </div>
+    </div>
+    <div style="background:var(--card);border-radius:16px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;border:0.5px solid var(--border)">
+      <span style="font-size:14px;font-weight:500">Total familia</span>
+      <span style="font-size:18px;font-weight:500;color:var(--accent)">${fmt(total)}</span>
+    </div>`;
+}
+
+function selPersonaFn(btn, persona) {
+  document.getElementById('btn-pere').classList.remove('sel');
+  document.getElementById('btn-alicia').classList.remove('sel');
+  btn.classList.add('sel');
+  selPersona = persona;
+}
+
+function buildMesSelIng() {
+  document.getElementById('mes-sel-ing').innerHTML = MESES.map(m => `
+    <button class="mes-btn${m===selMesIng?' sel':''}" onclick="selMesIngFn(this,'${m}')">${m}</button>
+  `).join('');
+}
+
+function selMesIngFn(btn, m) {
+  document.querySelectorAll('#mes-sel-ing .mes-btn').forEach(b => b.classList.remove('sel'));
+  btn.classList.add('sel');
+  selMesIng = m;
+  loadIngresos();
+}
+
+async function guardarIngreso() {
+  const amount = parseFloat(document.getElementById('ing-amount').value);
+  const btn = document.getElementById('ing-save-btn');
+  if (!amount || amount <= 0) { showIngToast('Introduce una cantidad válida', true); return; }
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+  try {
+    const r = await fetch(`${API}/api/ingreso`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persona: selPersona, importe: amount, mes: selMesIng }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showIngToast(d.mensaje, false);
+      document.getElementById('ing-amount').value = '';
+      loadIngresos();
+      anualCargado = false;
+      setTimeout(loadDash, 500);
+    } else {
+      showIngToast(d.error || 'Error guardando', true);
+    }
+  } catch(e) {
+    showIngToast('Error de conexión', true);
+  }
+  btn.disabled = false;
+  btn.textContent = '💰 Guardar ingreso';
+}
+
+function showIngToast(msg, isErr) {
+  const t = document.getElementById('ing-toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isErr ? ' err' : '');
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
 // ─── Anual ────────────────────────────────────────────────────────────────────
 async function loadAnual() {
   if (anualCargado) return;
@@ -750,6 +898,7 @@ function goTo(s) {
   document.getElementById('s-' + s).classList.add('active');
   document.getElementById('nav-' + s).classList.add('active');
   if (s === 'anual') loadAnual();
+  if (s === 'ing')   loadIngresos();
 }
 
 // ─── Service Worker ───────────────────────────────────────────────────────────

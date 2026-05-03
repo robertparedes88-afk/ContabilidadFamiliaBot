@@ -184,6 +184,41 @@ app.post('/api/gasto/editar', async (req,res) => {
   } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
 });
 
+app.get('/api/ingresos', async (req,res) => {
+  try {
+    const mes = (req.query.mes || mesActual()).toUpperCase();
+    const colIdx = MES_COLS[mes];
+    if (!colIdx) return res.status(400).json({error:'Mes inválido'});
+    const col = colLetra(colIdx);
+    const data = await sheetsBatchGet([
+      `${SHEET_NAME}!${col}6`,
+      `${SHEET_NAME}!${col}7`,
+    ]);
+    const v = data.valueRanges;
+    res.json({
+      mes,
+      pere:   cellToFloat(v[0]?.values?.[0]?.[0]),
+      alicia: cellToFloat(v[1]?.values?.[0]?.[0]),
+    });
+  } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
+});
+
+app.post('/api/ingreso', async (req,res) => {
+  try {
+    const {persona, importe, mes:mesParam} = req.body;
+    if (!persona || importe == null) return res.status(400).json({error:'Faltan datos'});
+    const mes = (mesParam || mesActual()).toUpperCase();
+    const colIdx = MES_COLS[mes];
+    if (!colIdx) return res.status(400).json({error:'Mes inválido'});
+    const p = persona.toLowerCase();
+    const fila = p === 'pere' ? 6 : p === 'alicia' ? 7 : null;
+    if (!fila) return res.status(400).json({error:'Persona inválida (pere|alicia)'});
+    const rango = rangoA1(fila, colIdx);
+    await sheetsUpdate(rango, [[floatToCell(parseFloat(importe))]]);
+    res.json({ok:true, persona, mes, importe: parseFloat(importe), mensaje:`✅ Ingreso de ${persona} (${mes}) actualizado a ${parseFloat(importe).toFixed(2)}€`});
+  } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
+});
+
 app.post('/api/ticket', async (req,res) => {
   try {
     const {imagen} = req.body;
