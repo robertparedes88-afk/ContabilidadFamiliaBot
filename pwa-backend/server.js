@@ -267,6 +267,7 @@ app.get('/api/categorias/todas', async (req,res) => {
     for (let i = 0; i < rows.length; i++) {
       const nombre = rows[i]?.[0]?.trim();
       if (!nombre) break;
+      if (nombre.toUpperCase().includes('TOTAL')) continue;
       categorias.push({ nombre, fila: 37 + i });
     }
     res.json({ categorias });

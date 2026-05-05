@@ -585,9 +585,12 @@ async function editarGasto(nombre, importeActual, mes) {
 // ─── Categorías ───────────────────────────────────────────────────────────────
 async function loadCats() {
   try {
-    const r = await fetch(`${API}/api/categorias`);
+    const r = await fetch(`${API}/api/categorias/todas`);
     const d = await r.json();
-    cats = d.categorias;
+    cats = (d.categorias || []).map(c => {
+      const key = nombreACat(c.nombre);
+      return { key, label: c.nombre, emoji: CAT_ICONS[key] || '📋' };
+    });
     renderCats();
   } catch(e) {}
 }
