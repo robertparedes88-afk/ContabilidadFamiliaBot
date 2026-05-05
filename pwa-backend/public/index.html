@@ -390,7 +390,8 @@ const API = '';
 const MESES = ['ENE','FEB','MAR','ABR','MAY','JUN','JUL','AGO','SEP','OCT','NOV','DIC'];
 const CAT_ICONS = {
   'comida/supermercado':'🛒','restaurante':'🍽️','gasolina':'⛽',
-  'salud':'💊','ropa':'👕','ocio':'🎭','otros':'📦'
+  'salud':'💊','ropa':'👕','ocio':'🎭','otros':'📦',
+  'amortizacion de deuda':'💳',
 };
 
 // ─── Estado ──────────────────────────────────────────────────────────────────
@@ -513,7 +514,8 @@ function nombreACat(nombre) {
   if (n.includes('gasolina'))                             return 'gasolina';
   if (n.includes('salud') || n.includes('farmacia'))      return 'salud';
   if (n.includes('ropa'))                                 return 'ropa';
-  if (n.includes('ocio') || n.includes('entretenimiento'))return 'ocio';
+  if (n.includes('ocio') || n.includes('entretenimiento'))      return 'ocio';
+  if (n.includes('amortiz') || n.includes('deuda'))             return 'amortizacion de deuda';
   return 'otros';
 }
 

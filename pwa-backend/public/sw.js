@@ -1,4 +1,4 @@
-const CACHE = 'familia-v5';
+const CACHE = 'familia-v6';
 const ASSETS = ['/', '/index.html', '/manifest.json'];
 
 self.addEventListener('install', e => {

@@ -23,6 +23,7 @@ const FILAS_VARIABLES = {
   'ropa':41,
   'ocio/entretenimiento':42,'ocio':42,
   'otros':43,
+  'amortizacion':44,'amortización':44,'amortizacion de deuda':44,'amortización de deuda':44,
 };
 
 async function getAccessToken() {
@@ -266,6 +267,7 @@ app.get('/api/categorias', (_,res) => res.json({categorias:[
   {key:'ropa',label:'Ropa',emoji:'👕'},
   {key:'ocio',label:'Ocio / Entretenimiento',emoji:'🎭'},
   {key:'otros',label:'Otros',emoji:'📦'},
+  {key:'amortizacion de deuda',label:'Amortización de deuda',emoji:'💳'},
 ]}));
 
 app.get('/api/debug-key', async (req,res) => {
