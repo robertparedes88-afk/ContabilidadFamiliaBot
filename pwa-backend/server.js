@@ -261,13 +261,14 @@ app.post('/api/ticket', async (req,res) => {
 
 app.get('/api/categorias/todas', async (req,res) => {
   try {
-    const data = await sheetsRequest(`${SHEET_NAME}!B37:B60`);
+    const data = await sheetsRequest(`${SHEET_NAME}!B37:B55`);
     const rows = data.values || [];
     const categorias = [];
     for (let i = 0; i < rows.length; i++) {
       const nombre = rows[i]?.[0]?.trim();
-      if (!nombre) break;
-      if (nombre.toUpperCase().includes('TOTAL')) continue;
+      if (!nombre) continue;
+      const u = nombre.toUpperCase();
+      if (u.includes('TOTAL') || u.includes('RESUMEN') || u.includes('AHORRO') || nombre === 'Concepto') continue;
       categorias.push({ nombre, fila: 37 + i });
     }
     res.json({ categorias });
