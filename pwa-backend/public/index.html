@@ -352,6 +352,30 @@
       </div>
     </div>
 
+    <!-- GESTIONAR -->
+    <div class="screen" id="s-gest">
+      <div class="top-bar" style="padding-bottom:4px">
+        <div class="top-title">Gestionar</div>
+      </div>
+      <div class="add-wrap">
+        <div>
+          <div class="form-label">Categorías variables</div>
+          <div id="gest-list" style="display:flex;flex-direction:column;gap:8px">
+            <div class="skel" style="height:50px;border-radius:16px"></div>
+            <div class="skel" style="height:50px;border-radius:16px"></div>
+          </div>
+        </div>
+        <div style="border-top:0.5px solid var(--border);padding-top:16px;display:flex;flex-direction:column;gap:12px">
+          <div class="form-label" style="margin-bottom:0">Añadir categoría</div>
+          <div style="display:flex;gap:8px">
+            <input class="text-inp" type="text" id="nueva-cat-inp" placeholder="Nombre de la categoría" style="flex:1">
+            <button class="save-btn" onclick="crearCategoria()" style="width:auto;padding:13px 18px;font-size:18px">➕</button>
+          </div>
+          <div class="toast" id="gest-toast"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- ANUAL -->
     <div class="screen" id="s-anual">
       <div class="top-bar" style="padding-bottom:4px">
@@ -375,6 +399,10 @@
       <button class="nav-btn" id="nav-ing" onclick="goTo('ing')">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 18v1c0 1.1-.9 2-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14c1.1 0 2 .9 2 2v1h-9a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
         Ingresos
+      </button>
+      <button class="nav-btn" id="nav-gest" onclick="goTo('gest')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54A.484.484 0 0 0 14 3h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.81 9.15a.49.49 0 0 0 .12.61l2.03 1.58c-.05.3-.07.63-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.04.24.24.41.48.41H14c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.09-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+        Gestionar
       </button>
       <button class="nav-btn" id="nav-anual" onclick="goTo('anual')">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/></svg>
@@ -755,6 +783,82 @@ async function confirmarTicket() {
   }
 }
 
+// ─── Gestionar ───────────────────────────────────────────────────────────────
+async function loadGestionar() {
+  const list = document.getElementById('gest-list');
+  list.innerHTML = '<div class="skel" style="height:50px;border-radius:16px"></div><div class="skel" style="height:50px;border-radius:16px;margin-top:8px"></div>';
+  try {
+    const r = await fetch(`${API}/api/categorias/todas`);
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    renderGestionar(d.categorias);
+  } catch(e) {
+    document.getElementById('gest-list').innerHTML = '<p style="padding:12px 4px;color:var(--danger);font-size:14px">Error cargando categorías</p>';
+  }
+}
+
+function renderGestionar(categorias) {
+  const list = document.getElementById('gest-list');
+  if (!categorias.length) {
+    list.innerHTML = '<p style="padding:12px 4px;color:var(--muted);font-size:14px">No hay categorías</p>';
+    return;
+  }
+  list.innerHTML = categorias.map(c => {
+    const key = nombreACat(c.nombre);
+    const emoji = CAT_ICONS[key] || '📋';
+    return `
+      <div class="item">
+        <div class="item-icon">${emoji}</div>
+        <div style="flex:1"><div class="item-name">${c.nombre}</div><div class="item-meta">Fila ${c.fila}</div></div>
+        <button class="icon-btn" onclick="eliminarCategoria(${c.fila},'${c.nombre.replace(/'/g,"\\'")}')">🗑️</button>
+      </div>`;
+  }).join('');
+}
+
+async function crearCategoria() {
+  const inp = document.getElementById('nueva-cat-inp');
+  const nombre = inp.value.trim();
+  if (!nombre) { showGestToast('Introduce un nombre', true); return; }
+  try {
+    const r = await fetch(`${API}/api/categorias/nueva`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ nombre }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      showGestToast(`✅ "${nombre}" creada`, false);
+      inp.value = '';
+      loadGestionar();
+      loadCats();
+    } else {
+      showGestToast(d.error || 'Error al crear', true);
+    }
+  } catch(e) { showGestToast('Error de conexión', true); }
+}
+
+async function eliminarCategoria(fila, nombre) {
+  if (!confirm(`¿Eliminar categoría "${nombre}"?`)) return;
+  try {
+    const r = await fetch(`${API}/api/categorias/${fila}`, { method: 'DELETE' });
+    const d = await r.json();
+    if (d.ok) {
+      loadGestionar();
+      loadCats();
+    } else {
+      showGestToast(d.error || 'Error al eliminar', true);
+    }
+  } catch(e) { showGestToast('Error de conexión', true); }
+}
+
+function showGestToast(msg, isErr) {
+  const t = document.getElementById('gest-toast');
+  t.textContent = msg;
+  t.className = 'toast' + (isErr ? ' err' : '');
+  t.style.display = 'block';
+  setTimeout(() => { t.style.display = 'none'; }, 3000);
+}
+
 // ─── Ingresos ────────────────────────────────────────────────────────────────
 async function loadIngresos() {
   document.getElementById('ing-cards').innerHTML = '<div class="skel" style="height:80px;border-radius:16px"></div>';
@@ -913,6 +1017,7 @@ function goTo(s) {
   document.getElementById('nav-' + s).classList.add('active');
   if (s === 'anual') loadAnual();
   if (s === 'ing')   loadIngresos();
+  if (s === 'gest')  loadGestionar();
 }
 
 // ─── Service Worker ───────────────────────────────────────────────────────────

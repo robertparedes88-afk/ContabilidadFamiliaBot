@@ -259,6 +259,46 @@ app.post('/api/ticket', async (req,res) => {
   } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
 });
 
+app.get('/api/categorias/todas', async (req,res) => {
+  try {
+    const data = await sheetsRequest(`${SHEET_NAME}!B37:B60`);
+    const rows = data.values || [];
+    const categorias = [];
+    for (let i = 0; i < rows.length; i++) {
+      const nombre = rows[i]?.[0]?.trim();
+      if (!nombre) break;
+      categorias.push({ nombre, fila: 37 + i });
+    }
+    res.json({ categorias });
+  } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
+});
+
+app.post('/api/categorias/nueva', async (req,res) => {
+  try {
+    const nombre = req.body?.nombre?.trim();
+    if (!nombre) return res.status(400).json({error:'Falta nombre'});
+    const data = await sheetsRequest(`${SHEET_NAME}!B37:B60`);
+    const rows = data.values || [];
+    let lastFila = 36;
+    for (let i = 0; i < rows.length; i++) {
+      if (rows[i]?.[0]?.trim()) lastFila = 37 + i;
+      else break;
+    }
+    const newFila = lastFila + 1;
+    await sheetsUpdate(`${SHEET_NAME}!B${newFila}:C${newFila}`, [[nombre, 'Variables']]);
+    res.json({ ok: true, fila: newFila, nombre });
+  } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
+});
+
+app.delete('/api/categorias/:fila', async (req,res) => {
+  try {
+    const fila = parseInt(req.params.fila);
+    if (isNaN(fila) || fila < 37) return res.status(400).json({error:'Fila inválida'});
+    await sheetsUpdate(`${SHEET_NAME}!B${fila}:C${fila}`, [['', '']]);
+    res.json({ ok: true, fila });
+  } catch(err) { console.error(err); res.status(500).json({error:err.message}); }
+});
+
 app.get('/api/categorias', (_,res) => res.json({categorias:[
   {key:'comida/supermercado',label:'Comida / Supermercado',emoji:'🛒'},
   {key:'restaurante',label:'Restaurantes',emoji:'🍽️'},
